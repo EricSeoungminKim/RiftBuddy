@@ -124,11 +124,17 @@ app.whenReady().then(() => {
 
   startLeagueTracking(overlayWin);
 
-  const tabKeys = ["1", "2", "3", "4", "5"] as const;
-  tabKeys.forEach((key, index) => {
-    globalShortcut.register(`CommandOrControl+Shift+${key}`, () => {
-      overlayWin?.webContents.send("riftbuddy:tab-switch", index);
-    });
+  let currentTab = 0;
+  const TAB_COUNT = 5;
+
+  globalShortcut.register("CommandOrControl+Shift+]", () => {
+    currentTab = (currentTab + 1) % TAB_COUNT;
+    overlayWin?.webContents.send("riftbuddy:tab-switch", currentTab);
+  });
+
+  globalShortcut.register("CommandOrControl+Shift+[", () => {
+    currentTab = (currentTab - 1 + TAB_COUNT) % TAB_COUNT;
+    overlayWin?.webContents.send("riftbuddy:tab-switch", currentTab);
   });
 
   globalShortcut.register("CommandOrControl+Shift+B", () => {
