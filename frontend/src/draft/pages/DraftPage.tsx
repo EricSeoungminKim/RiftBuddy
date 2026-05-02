@@ -1,16 +1,23 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ChampionSlot from '../components/ChampionSlot'
 import RecommendPanel from '../components/RecommendPanel'
 import LaningPanel from '../components/LaningPanel'
 import SynergyPanel from '../components/SynergyPanel'
 import { useDraftAnalysis } from '../hooks/useDraftAnalysis'
+import { useChampSelect } from '../hooks/useChampSelect'
 
 const ROLES = ['탑', '정글', '미드', '바텀', '서폿']
 
-type Team = [string, string, string, string, string] // championId per role slot, empty = ''
+type Team = [string, string, string, string, string]
 
 const EMPTY_TEAM: Team = ['', '', '', '', '']
+
+function toTeam(arr: string[]): Team {
+  const t: Team = [...EMPTY_TEAM]
+  arr.slice(0, 5).forEach((v, i) => { t[i] = v })
+  return t
+}
 
 export default function DraftPage() {
   const navigate = useNavigate()
@@ -19,8 +26,26 @@ export default function DraftPage() {
   const [selectedAllyIdx, setSelectedAllyIdx] = useState<number | null>(null)
   const [championInput, setChampionInput] = useState('')
   const [myRole, setMyRole] = useState('미드')
+  const prevAllyRef = useRef<string>('')
+  const prevEnemyRef = useRef<string>('')
 
   const { analysis, matchup, teamStrategy, loading, error, fetchAnalysis, fetchMatchup, fetchTeamStrategy } = useDraftAnalysis()
+  const champSelect = useChampSelect(true)
+
+  // Sync LCU picks into slots (only update changed slots)
+  useEffect(() => {
+    if (!champSelect.inProgress) return
+    const allyKey = champSelect.ally.join(',')
+    const enemyKey = champSelect.enemy.join(',')
+    if (allyKey !== prevAllyRef.current) {
+      prevAllyRef.current = allyKey
+      setAlly(toTeam(champSelect.ally))
+    }
+    if (enemyKey !== prevEnemyRef.current) {
+      prevEnemyRef.current = enemyKey
+      setEnemy(toTeam(champSelect.enemy))
+    }
+  }, [champSelect])
 
   useEffect(() => {
     const allFilled = ally.every(Boolean) && enemy.every(Boolean)
