@@ -9,7 +9,12 @@ def test_build_context_packet_healthy_player():
         gold=2500,
         level=10,
         game_time=600.0,
-        champion_name="Rumble",
+        champion_name="럼블",
+        position="BOTTOM",
+        assigned_position="BOTTOM",
+        ally_champions=("럼블", "소나"),
+        enemy_champions=("니달리", "갈리오"),
+        all_champions=("럼블", "소나", "니달리", "갈리오"),
         kills=3,
         deaths=1,
         assists=2,
@@ -21,9 +26,13 @@ def test_build_context_packet_healthy_player():
     assert packet.health_percent == 90.0
     assert packet.gold == 2500
     assert packet.game_time_minutes == 10.0
-    assert "healthy" in packet.summary.lower()
-    assert "Rumble" in packet.summary
-    assert "82 CS" in packet.summary
+    assert "체력 안정" in packet.summary
+    assert "럼블" in packet.summary
+    assert "내 배정 포지션 바텀" in packet.summary
+    assert "현재 표시 포지션 바텀" in packet.summary
+    assert "현재 게임 챔피언: 럼블, 소나, 니달리, 갈리오" in packet.summary
+    assert "상대 챔피언: 니달리, 갈리오" in packet.summary
+    assert "CS 82" in packet.summary
     assert "KDA 3/1/2" in packet.summary
 
 
@@ -33,4 +42,23 @@ def test_build_context_packet_low_health():
     )
     packet = build_context_packet(state)
     assert packet.health_percent == 20.0
-    assert "low health" in packet.summary.lower()
+    assert "체력 낮음" in packet.summary
+
+
+def test_context_packet_includes_champion_and_position():
+    state = GameState(
+        current_health=1000,
+        max_health=2000,
+        gold=1500,
+        level=7,
+        game_time=300,
+        champion_name="Renekton",
+        assigned_position="TOP",
+        kills=2,
+        deaths=1,
+        assists=3,
+        creep_score=50,
+    )
+    packet = build_context_packet(state)
+    assert packet.champion_name == "Renekton"
+    assert packet.assigned_position == "TOP"

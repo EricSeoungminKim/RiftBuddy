@@ -1,3 +1,4 @@
+import re
 from typing import Optional
 
 import anthropic
@@ -13,9 +14,11 @@ You give concise, actionable macro advice in 1-2 sentences.
 Be encouraging and direct. Never give generic advice; always tie it to the current game state."""
 
 KOREAN_ONLY_PROMPT = """You are RiftBuddy, an expert League of Legends duo partner and coach.
-You must respond only in Korean Hangul and common League Korean terms.
-Do not use English words, romanized Korean, Chinese, Japanese, or mixed-language phrases.
-Translate champion, item, and macro terms into natural Korean when possible.
+Respond in Korean sentences using natural Korean League of Legends server terms.
+Allowed LoL terms include 탑, 정글, 미드, 바텀, 서폿, CS, KDA, AP, AD, CC, 오브젝트, 라인, 웨이브, 귀환, 갱, 합류, 시야.
+Do not use Chinese, Japanese, broken characters, romanized Korean, or random English fragments.
+Never translate bottom lane as 바닥 라인. Use 바텀.
+Translate positions naturally: top=탑, jungle=정글, mid/middle=미드, bottom/adc=바텀, support/utility=서폿.
 Keep the advice concise, direct, and actionable in 1-2 short sentences."""
 
 GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -25,8 +28,9 @@ GEMINI_GENERATE_CONTENT_URL = "https://generativelanguage.googleapis.com/v1beta/
 def _language_instruction(language: str) -> str:
     if language == "ko":
         return (
-            "한국어만 사용하세요. 영어 단어, 로마자 표기, 중국어, 일본어를 섞지 마세요. "
-            "챔피언명처럼 번역이 어려운 고유명사를 제외하고 모든 표현을 자연스러운 한국어로 쓰세요. "
+            "한국어 문장과 한국 서버 롤 용어를 사용하세요. "
+            "탑, 정글, 미드, 바텀, 서폿, CS, KDA, AP, AD, CC, 오브젝트, 라인, 웨이브, 귀환, 갱, 합류, 시야는 허용됩니다. "
+            "중국어, 일본어, 깨진 문자, 의미 없는 영어 조각은 쓰지 마세요. "
             "짧고 직접적인 콜처럼 1-2문장으로 답하세요."
         )
     return "Respond in natural English. Keep it short, direct, and game-callout style."
@@ -43,8 +47,26 @@ def clean_response_language(text: str, language: str) -> str:
     replacements = {
         "Focus": "집중하세요",
         "focus": "집중하세요",
-        "CS": "미니언 처치",
-        "cs": "미니언 처치",
+        "bottom lane": "바텀",
+        "Bottom lane": "바텀",
+        "bottom": "바텀",
+        "Bottom": "바텀",
+        "jungle": "정글",
+        "Jungle": "정글",
+        "middle lane": "미드",
+        "Middle lane": "미드",
+        "mid lane": "미드",
+        "Mid lane": "미드",
+        "middle": "미드",
+        "Middle": "미드",
+        "support": "서폿",
+        "Support": "서폿",
+        "utility": "서폿",
+        "Utility": "서폿",
+        "top lane": "탑",
+        "Top lane": "탑",
+        "top": "탑",
+        "Top": "탑",
         "gold": "골드",
         "Gold": "골드",
         "level": "레벨",
@@ -64,10 +86,38 @@ def clean_response_language(text: str, language: str) -> str:
         "safe": "안전하게",
         "Safe": "안전하게",
         "Rumble": "럼블",
+        "Doran's Shield": "도란의 방패",
+        "Doran Shield": "도란의 방패",
+        "Boots": "장화",
+        "First Blood": "첫 처치",
+        "FirstBlood": "첫 처치",
+        "objective": "오브젝트",
+        "Objective": "오브젝트",
+        "dragon": "용",
+        "Dragon": "용",
+        "baron": "바론",
+        "Baron": "바론",
+        "rift herald": "전령",
+        "Rift Herald": "전령",
+        "gank": "갱",
+        "Gank": "갱",
+        "vision": "시야",
+        "Vision": "시야",
     }
     cleaned = text
-    for source, target in replacements.items():
+    for source, target in sorted(replacements.items(), key=lambda item: len(item[0]), reverse=True):
         cleaned = cleaned.replace(source, target)
+    allowed_terms = ("CS", "KDA", "AP", "AD", "CC")
+    placeholders = {term: f"§{index}§" for index, term in enumerate(allowed_terms)}
+    for term, placeholder in placeholders.items():
+        cleaned = re.sub(rf"\b{term}\b", placeholder, cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"[A-Za-z_]+", "", cleaned)
+    for term, placeholder in placeholders.items():
+        cleaned = cleaned.replace(placeholder, term)
+    cleaned = re.sub(r"[\u3400-\u4dbf\u4e00-\u9fff\u3040-\u30ff]+", "", cleaned)
+    cleaned = cleaned.replace("'", "").replace('"', "")
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    cleaned = re.sub(r"\s+([,.!?%])", r"\1", cleaned)
     return cleaned
 
 
@@ -101,9 +151,14 @@ def get_mock_advice(packet: ContextPacket, user_query: Optional[str], language: 
 
 
 def build_user_content(packet: ContextPacket, user_query: Optional[str], language: str = "en") -> str:
-    user_content = f"Current game state:\n{packet.summary}"
+    role_line = ""
+    if packet.champion_name != "Unknown" and packet.assigned_position != "UNKNOWN":
+        role_line = f"Player role: {packet.champion_name} ({packet.assigned_position})\n"
+    user_content = f"{role_line}Current game state:\n{packet.summary}"
     if user_query:
         user_content += f"\n\nPlayer asks: {user_query}"
+    elif language == "ko":
+        user_content += "\n\nPlayer asks: 지금 가장 중요한 다음 행동은 뭐야?"
     else:
         user_content += "\n\nWhat should I focus on right now?"
     user_content += f"\n\nLanguage instruction: {_language_instruction(language)}"
@@ -134,6 +189,7 @@ async def get_groq_advice(packet: ContextPacket, user_query: Optional[str], lang
     payload = {
         "model": CONFIG["groq_model"],
         "max_tokens": 150,
+        "temperature": 0.2,
         "messages": [
             {"role": "system", "content": _system_prompt(language)},
             {"role": "user", "content": build_user_content(packet, user_query, language)},
