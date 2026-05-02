@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import ChampionSlot from '../components/ChampionSlot'
 import RecommendPanel from '../components/RecommendPanel'
 import LaningPanel from '../components/LaningPanel'
@@ -12,6 +13,7 @@ type Team = [string, string, string, string, string] // championId per role slot
 const EMPTY_TEAM: Team = ['', '', '', '', '']
 
 export default function DraftPage() {
+  const navigate = useNavigate()
   const [ally, setAlly] = useState<Team>([...EMPTY_TEAM])
   const [enemy, setEnemy] = useState<Team>([...EMPTY_TEAM])
   const [selectedAllyIdx, setSelectedAllyIdx] = useState<number | null>(null)
@@ -19,6 +21,11 @@ export default function DraftPage() {
   const [myRole, setMyRole] = useState('미드')
 
   const { analysis, matchup, teamStrategy, loading, error, fetchAnalysis, fetchMatchup, fetchTeamStrategy } = useDraftAnalysis()
+
+  useEffect(() => {
+    const allFilled = ally.every(Boolean) && enemy.every(Boolean)
+    if (allFilled) navigate('/post-lock-in')
+  }, [ally, enemy, navigate])
 
   const handleAllySlotClick = (idx: number) => {
     setSelectedAllyIdx(idx === selectedAllyIdx ? null : idx)
