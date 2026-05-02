@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 
-const BASE = 'http://localhost:8765'
+const BASE = import.meta.env.VITE_RIFTBUDDY_API_URL ?? 'http://localhost:8001'
 
 export interface CoachReport {
   strengths: string

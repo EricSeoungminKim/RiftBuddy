@@ -8,7 +8,7 @@ function GameEndListener() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8765/ws')
+    const ws = new WebSocket(import.meta.env.VITE_RIFTBUDDY_WS_URL ?? 'ws://localhost:8001/ws')
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
