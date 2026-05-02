@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from contextlib import asynccontextmanager
 from contextlib import suppress
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -19,33 +20,94 @@ from backend.voice.stt import is_valid_transcript
 from backend.voice.tts import text_to_speech_bytes
 from backend.voice.wake_word import capture_voice_question_once, run_wake_word_loop
 
-app = FastAPI(title="RiftBuddy Backend")
-app.include_router(draft_router)
-app.include_router(lcu_router)
-app.include_router(postgame_router)
 logger = logging.getLogger(__name__)
 active_websockets: set[WebSocket] = set()
 wake_word_task: asyncio.Task | None = None
+_game_poll_task: asyncio.Task | None = None
 
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-
-@app.on_event("startup")
-async def startup() -> None:
+async def _start_wake_word_task() -> None:
     global wake_word_task
     if CONFIG["wake_word"] == "1":
         wake_word_task = asyncio.create_task(run_wake_word_loop(broadcast_wake_ack, broadcast_voice_question))
 
 
-@app.on_event("shutdown")
-async def shutdown() -> None:
+async def _stop_wake_word_task() -> None:
     if wake_word_task:
         wake_word_task.cancel()
         with suppress(asyncio.CancelledError):
             await wake_word_task
+
+
+def _game_state_to_ws_payload(state) -> dict:
+    return {
+        "type": "game_state",
+        "gameTime": state.game_time,
+        "championName": state.champion_name,
+        "summonerName": state.summoner_name,
+        "position": state.assigned_position,
+        "health": state.current_health,
+        "maxHealth": state.max_health,
+        "gold": state.gold,
+        "level": state.level,
+        "kills": state.kills,
+        "deaths": state.deaths,
+        "assists": state.assists,
+        "cs": state.creep_score,
+        "wardScore": state.ward_score,
+        "items": list(state.items),
+        "summonerSpells": list(state.summoner_spells),
+        "recentEvents": list(state.recent_events),
+        "allyGold": state.ally_gold,
+        "enemyGold": state.enemy_gold,
+        "goldDiff": state.gold_diff,
+        "allyChampions": list(state.ally_champions),
+        "enemyChampions": list(state.enemy_champions),
+    }
+
+
+async def _poll_game_state() -> None:
+    while True:
+        await asyncio.sleep(3)
+        try:
+            state = await fetch_game_state()
+        except Exception as exc:
+            logger.warning("Game state poll error: %s", exc)
+            continue
+        if state is None:
+            continue
+        payload = _game_state_to_ws_payload(state)
+        for ws in list(active_websockets):
+            try:
+                await ws.send_json(payload)
+            except Exception:
+                pass
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    global _game_poll_task
+    await _start_wake_word_task()
+    _game_poll_task = asyncio.create_task(_poll_game_state())
+    try:
+        yield
+    finally:
+        await _stop_wake_word_task()
+        if _game_poll_task:
+            _game_poll_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await _game_poll_task
+
+
+app = FastAPI(title="RiftBuddy Backend", lifespan=lifespan)
+app.include_router(draft_router)
+app.include_router(lcu_router)
+app.include_router(postgame_router)
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 
 @app.websocket("/ws")
