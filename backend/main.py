@@ -8,6 +8,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from backend.auth.supabase_client import verify_token
 from backend.draft.router import router as draft_router
 from backend.lcu.router import router as lcu_router
+from backend.postgame.router import router as postgame_router
+from backend.postgame.router import game_session as _game_session
 from backend.config import CONFIG
 from backend.context.engine import build_context_packet
 from backend.context.question_planner import build_planned_question
@@ -20,6 +22,7 @@ from backend.voice.wake_word import capture_voice_question_once, run_wake_word_l
 app = FastAPI(title="RiftBuddy Backend")
 app.include_router(draft_router)
 app.include_router(lcu_router)
+app.include_router(postgame_router)
 logger = logging.getLogger(__name__)
 active_websockets: set[WebSocket] = set()
 wake_word_task: asyncio.Task | None = None
@@ -115,7 +118,16 @@ async def send_advice(websocket: WebSocket, user_query: str | None, language: st
     game_state = await fetch_game_state()
     if game_state is None:
         await websocket.send_json({"type": "error", "message": "Game not running"})
+        if not _game_session.is_empty:
+            for ws in list(active_websockets):
+                try:
+                    await ws.send_json({"type": "game_end"})
+                except Exception:
+                    pass
+            _game_session.clear()
         return
+
+    _game_session.add_snapshot(game_state)
 
     if planned and not user_query:
         user_query = build_planned_question(game_state, language)
