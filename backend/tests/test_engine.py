@@ -62,3 +62,4 @@ def test_context_packet_includes_champion_and_position():
     packet = build_context_packet(state)
     assert packet.champion_name == "Renekton"
     assert packet.assigned_position == "TOP"
+    assert packet.creep_score == 50
