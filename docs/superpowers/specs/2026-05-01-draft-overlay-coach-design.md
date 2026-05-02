@@ -106,6 +106,7 @@ User clicks "새 경기 시작"
 ```
 
 **Behavior:**
+
 - User selects role from dropdown (TOP/JG/MID/BOT/SUP).
 - User types ally picks (1–5) and enemy picks (1–5) into champion search fields in the header icon slots.
 - On each pick entry, frontend calls `GET /draft/champion-analysis?champion=&role=` and `GET /draft/matchup?my_champion=&enemy_champion=&role=`.
@@ -147,10 +148,48 @@ Triggered when draft complete. Same window, React router navigation.
 ```
 
 **Data sources:**
+
 - Runes: `GET /draft/runes?champion=&role=` → op.gg MCP `lol_get_champion_analysis`.
 - Team strategy: `POST /draft/team-strategy` body `{ally: [...], enemy: [...], my_champion, my_role}` → LLM generates Korean paragraph.
 - Matchup: `GET /draft/matchup?my_champion=&enemy_champion=&role=` → op.gg MCP `lol_get_lane_matchup_guide`.
 - Rune icons: DDragon `https://ddragon.leagueoflegends.com/cdn/img/perk-images/...`
+
+**LCU Rune Auto-Apply:**
+
+Button "룬 자동 적용 ⚠️ (비공식)" appears below the rune panel. Disclaimer shown on first use: "이 기능은 Riot Games의 공식 지원 기능이 아닙니다. LCU API를 사용합니다."
+
+Flow:
+
+1. Backend reads League lockfile to get port + auth token.
+2. Calls `GET /lol-perks/v1/currentpage` → gets current rune page ID.
+3. Calls `DELETE /lol-perks/v1/pages/{id}` → deletes it (avoids page limit).
+4. Calls `POST /lol-perks/v1/pages` with recommended rune page JSON.
+5. Returns success → frontend shows "룬이 적용되었습니다 ✓".
+
+Lockfile paths:
+
+- macOS: `/Applications/League of Legends.app/Contents/LoL/lockfile`
+- Windows: `C:\Riot Games\League of Legends\lockfile`
+- Lockfile format: `ProcessName:PID:Port:Password:Protocol`
+
+LCU auth: Basic auth with `riot:{password}` base64-encoded. `verify=False` for self-signed cert.
+
+Rune page JSON schema:
+```json
+{
+  "name": "RiftBuddy — Rumble TOP",
+  "primaryStyleId": 8100,
+  "subStyleId": 8300,
+  "selectedPerkIds": [8112, 8143, 8138, 8135, 8304, 8345, 5007, 5002, 5001],
+  "current": true
+}
+```
+
+New backend endpoint: `POST /lcu/apply-runes` — body: rune page JSON from op.gg MCP. Returns `{success: bool, message: str}`.
+
+Library: `lcu-driver` (`pip install lcu-driver`) wraps lockfile detection and auth automatically. Use as fallback if manual lockfile read fails.
+
+**Policy note:** Same gray area as Blitz/op.gg desktop. Feature is opt-in, clearly labeled unofficial. No automation of gameplay — only rune page write during champ select.
 
 ---
 
@@ -184,22 +223,25 @@ Triggered when Live Client returns 404 (game ended). Draft Window restores and n
 ```
 
 **Data flow:**
+
 1. During game: backend receives `POST /game/snapshot` every 30s with current `GameState`.
 2. On game end (Live Client 404): backend calls `POST /postgame/coach` internally.
 3. Coach endpoint: collects all stored snapshots → builds summary prompt → LLM generates structured Korean output.
 4. LLM prompt structure:
+
 ```
 다음은 이번 경기 중 수집된 게임 상태 스냅샷입니다:
 [snapshot list: time, health%, gold, KDA, CS, position, recent events]
 
 다음 항목을 한국어로 분석해주세요:
 1. 잘한 점 3가지
-2. 개선할 점 3가지  
+2. 개선할 점 3가지
 3. 핵심 순간 3가지 (타임스탬프 포함)
 4. 다음 경기 집중 목표 2가지
 
 JSON 형식으로 응답: {"strengths": [], "improvements": [], "moments": [], "goals": []}
 ```
+
 5. Frontend parses JSON, renders structured view.
 6. "새 경기 시작" → clears snapshots via `DELETE /game/snapshots`, navigates to Screen 1.
 
@@ -226,6 +268,7 @@ New: tabbed panel 520×420. Tab bar at top. Active tab highlighted teal (#00c8a0
 ```
 
 **Tab switching:**
+
 - `Cmd+Shift+1` → AI tab
 - `Cmd+Shift+2` → Timers tab
 - `Cmd+Shift+3` → Gold tab
@@ -233,13 +276,44 @@ New: tabbed panel 520×420. Tab bar at top. Active tab highlighted teal (#00c8a0
 - `Cmd+Shift+5` → Ults tab
 - Click on tab: requires settings mode (`Cmd+Shift+,` disables click-through temporarily for 5s)
 
-**Overlay position:** configurable via `Cmd+Shift+,` settings panel:
-- TOP_RIGHT (default)
-- TOP_LEFT
-- BOTTOM_RIGHT
-- BOTTOM_LEFT
+**Overlay positioning — League window tracking (Option C):**
 
-Position stored in `.env` as `RIFTBUDDY_OVERLAY_POSITION=TOP_RIGHT`.
+Overlay auto-tracks the League of Legends game window. No preset fixed position. Two-step approach:
+
+**Step 1 — Detect League window bounds:**
+- Electron main process uses `screen` API + native window enumeration to find the `League of Legends` process window.
+- macOS: `AppleScript` via `osascript` — `tell application "System Events" to get position/size of window of process "League of Legends"`
+- Windows: `user32.dll` via `node-ffi-napi` or `get-windows` npm package — `FindWindow(NULL, "League of Legends")` + `GetWindowRect`
+- Polls every 2s to handle window moves/resizes.
+- Stored as `{ x, y, width, height }` in Electron main process state.
+
+**Step 2 — Place panels at HUD-safe zones within League window:**
+
+League HUD layout is fixed relative to window bounds regardless of resolution:
+
+```
+League Window (x, y, w, h)
+├── TOP-LEFT safe zone:     x+10,       y+10,       w*0.20, h*0.12   ← Timers panel
+├── TOP-RIGHT safe zone:    x+w*0.75,   y+10,       w*0.24, h*0.20   ← Gold panel
+├── LEFT EDGE safe zone:    x+10,       y+h*0.20,   w*0.18, h*0.55   ← AI chat panel
+├── RIGHT EDGE safe zone:   x+w*0.80,   y+h*0.20,   w*0.19, h*0.40  ← Buffs/Ults panel
+└── BOTTOM-LEFT safe zone:  x+10,       y+h*0.82,   w*0.25, h*0.16  ← (reserved)
+```
+
+Minimap is always bottom-right → never place panels there.
+Scoreboard is top-center → panels stay left/right edges.
+HUD bar is bottom-center → panels stay above `y+h*0.80`.
+
+**Panel layout per tab:**
+- AI chat: LEFT EDGE zone (tall, scrollable)
+- Timers: TOP-LEFT zone (compact, 4 rows)
+- Gold: TOP-RIGHT zone (table layout)
+- Buffs: RIGHT EDGE zone (top portion)
+- Ults: RIGHT EDGE zone (bottom portion, or same panel scrollable)
+
+Tab bar rendered as floating pill above the active panel, not a separate fixed bar.
+
+`Cmd+Shift+,` opens settings overlay (disables click-through 5s) to let user adjust zone offsets if needed. Offsets stored in `.env` as `RIFTBUDDY_OVERLAY_OFFSET_X=0` / `RIFTBUDDY_OVERLAY_OFFSET_Y=0`.
 
 ---
 
@@ -254,12 +328,14 @@ Existing USER/Buddy chat messages. No changes to behavior.
 Data source: `recent_events` from Live Client (`/liveclientdata/eventdata`).
 
 Tracked timers:
+
 - Dragon: 5min respawn after kill. First spawn at 5:00.
 - Baron: 6min respawn after kill. Spawns at 20:00.
 - Herald: spawns at 8:00, despawns at 19:45.
 - Rift Scuttler: 2.5min respawn.
 
 Display:
+
 ```
 ⏱ OBJECTIVE TIMERS
 Dragon    ████░░░░  1:23 remaining
@@ -277,6 +353,7 @@ Countdown updates every second via frontend timer (not backend). Backend sends s
 Data source: `ally_gold`, `enemy_gold`, `gold_diff` already in `GameState`. Per-player breakdown from `allPlayers` items + scores.
 
 Display:
+
 ```
 💰 GOLD TRACKER
               MY TEAM    ENEMY
@@ -299,6 +376,7 @@ Color: green diff if ally ahead, red if behind.
 Data source: `recent_events` — detect `DragonKill`, `BaronKill`, `HeraldKill` events with `Stolen` flag.
 
 Display:
+
 ```
 🐉 MONSTER BUFFS
 Baron Buff   [Rumble icon]  4:32 remaining
@@ -317,6 +395,7 @@ Data source: `allPlayers` champion names + levels from Live Client. CDR from `ch
 Cooldown calculation: base ult CD per champion (stored as static JSON `backend/data/ult_cooldowns.json`) minus CDR%.
 
 Display:
+
 ```
 ⚡ ULTIMATE TIMERS
 [Rumble]   READY  ✓
@@ -343,7 +422,7 @@ Ult used detection: backend emits WebSocket event when a `ChampionKill` or abili
 ### GET /draft/matchup
 
 ```python
-# Query params: my_champion (str), enemy_champion (str), role (str)  
+# Query params: my_champion (str), enemy_champion (str), role (str)
 # Returns: laning_strength, early_advantage, mid_advantage, late_advantage, tips[]
 # Source: op.gg MCP lol_get_lane_matchup_guide
 ```
@@ -500,19 +579,23 @@ globalShortcut.register("CommandOrControl+Shift+Comma", () => {
 ## Testing Plan
 
 **Draft Window:**
+
 - Mock op.gg MCP responses → verify recommendation panel renders top 5 correctly.
 - Enter 10 champions → verify auto-transition to Screen 2.
 - Test rune display with DDragon image URLs.
 - Test "← 드래프트로 돌아가기" resets state.
 
 **Post-game Coach:**
+
 - Seed 5 fake GameState snapshots → call `/postgame/coach` → verify LLM JSON parses into 3 strengths, 3 improvements, 3 moments, 2 goals.
 - Test "새 경기 시작" clears snapshots and navigates to Screen 1.
 
 **Overlay tabs:**
+
 - Inject fake event data → verify dragon timer counts down correctly.
 - Verify gold tracker shows correct ally/enemy diff color.
 - Verify click-through re-enables after 5s settings mode.
 
 **Integration:**
+
 - Full flow: app launch → draft → game start (overlay appears, draft minimizes) → game end (coach appears).
