@@ -6,14 +6,20 @@ from contextlib import suppress
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from backend.auth.supabase_client import verify_token
+from backend.draft.router import router as draft_router
+from backend.lcu.router import router as lcu_router
 from backend.config import CONFIG
 from backend.context.engine import build_context_packet
+from backend.context.question_planner import build_planned_question
 from backend.llm.advisor import get_advice
 from backend.riot.live_client import fetch_game_state
+from backend.voice.stt import is_valid_transcript
 from backend.voice.tts import text_to_speech_bytes
-from backend.voice.wake_word import run_wake_word_loop
+from backend.voice.wake_word import capture_voice_question_once, run_wake_word_loop
 
 app = FastAPI(title="RiftBuddy Backend")
+app.include_router(draft_router)
+app.include_router(lcu_router)
 logger = logging.getLogger(__name__)
 active_websockets: set[WebSocket] = set()
 wake_word_task: asyncio.Task | None = None
@@ -53,10 +59,40 @@ async def websocket_endpoint(websocket: WebSocket, token: str = ""):
         while True:
             raw = await websocket.receive_text()
             msg = json.loads(raw)
+            action = msg.get("action", "advice")
             user_query = msg.get("query")
+            mode = msg.get("mode")
             language = msg.get("language") or CONFIG["response_language"]
 
-            await send_advice(websocket, user_query=user_query, language=language)
+            if action == "listen":
+                await websocket.send_json(
+                    {
+                        "type": "listening",
+                        "text": "준비하세요. 곧 말하면 됩니다..." if language == "ko" else "Get ready. Speak in a moment...",
+                    }
+                )
+                await asyncio.sleep(float(CONFIG["question_prepare_seconds"]))
+                await websocket.send_json(
+                    {
+                        "type": "listening",
+                        "text": "Buddy가 듣고 있습니다..." if language == "ko" else "Buddy is listening...",
+                    }
+                )
+                question = await capture_voice_question_once()
+                if not is_valid_transcript(question):
+                    await websocket.send_json(
+                        {
+                            "type": "error",
+                            "message": "질문을 제대로 듣지 못했습니다. 다시 눌러 말해주세요."
+                            if language == "ko"
+                            else "I could not hear the question. Press the hotkey and try again.",
+                        }
+                    )
+                    continue
+                await websocket.send_json({"type": "transcript", "text": question})
+                await send_advice(websocket, user_query=question, language=language)
+            else:
+                await send_advice(websocket, user_query=user_query, language=language, planned=mode == "planned")
     except WebSocketDisconnect:
         pass
     finally:
@@ -66,7 +102,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = ""):
 async def broadcast_wake_ack(transcript: str) -> None:
     for websocket in list(active_websockets):
         await websocket.send_json({"type": "transcript", "text": transcript})
-        await websocket.send_json({"type": "listening", "text": "네?"})
+        await websocket.send_json({"type": "listening", "text": "Buddy가 듣고 있습니다..."})
 
 
 async def broadcast_voice_question(question: str) -> None:
@@ -75,11 +111,15 @@ async def broadcast_voice_question(question: str) -> None:
         await send_advice(websocket, user_query=question, language=CONFIG["response_language"])
 
 
-async def send_advice(websocket: WebSocket, user_query: str | None, language: str) -> None:
+async def send_advice(websocket: WebSocket, user_query: str | None, language: str, planned: bool = False) -> None:
     game_state = await fetch_game_state()
     if game_state is None:
         await websocket.send_json({"type": "error", "message": "Game not running"})
         return
+
+    if planned and not user_query:
+        user_query = build_planned_question(game_state, language)
+        await websocket.send_json({"type": "transcript", "text": user_query})
 
     packet = build_context_packet(game_state)
     advice = await get_advice(packet, user_query=user_query, language=language)
