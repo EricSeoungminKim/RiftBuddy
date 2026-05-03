@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain } from "electron";
+import { app, BrowserWindow, globalShortcut } from "electron";
 import { exec } from "child_process";
 import path from "path";
 
