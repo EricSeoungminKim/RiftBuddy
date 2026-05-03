@@ -17,9 +17,11 @@ async def test_fetch_game_state_returns_game_state():
         },
         "allPlayers": [
             {
-                "championName": "Rumble",
+                "championName": "럼블",
                 "riotId": "LEGENO#2026",
                 "summonerName": "LEGENO#2026",
+                "position": "BOTTOM",
+                "team": "ORDER",
                 "scores": {
                     "kills": 2,
                     "deaths": 1,
@@ -27,12 +29,30 @@ async def test_fetch_game_state_returns_game_state():
                     "creepScore": 64,
                     "wardScore": 5.0,
                 },
-                "items": [{"displayName": "Doran's Shield"}],
+                "items": [{"displayName": "Doran's Shield", "price": 450}],
                 "summonerSpells": {
                     "summonerSpellOne": {"displayName": "Ignite"},
                     "summonerSpellTwo": {"displayName": "Flash"},
                 },
-            }
+            },
+            {
+                "championName": "니달리",
+                "riotId": "Nidalee#BOT",
+                "summonerName": "니달리 봇",
+                "position": "JUNGLE",
+                "team": "CHAOS",
+                "scores": {},
+                "items": [{"displayName": "Amplifying Tome", "price": 400}],
+            },
+            {
+                "championName": "갈리오",
+                "riotId": "Galio#BOT",
+                "summonerName": "갈리오 봇",
+                "position": "MIDDLE",
+                "team": "CHAOS",
+                "scores": {},
+                "items": [{"displayName": "Boots", "price": 300}],
+            },
         ],
         "events": {"Events": []},
         "gameData": {"gameTime": 420.0, "gameMode": "PRACTICETOOL"},
@@ -46,10 +66,18 @@ async def test_fetch_game_state_returns_game_state():
     assert state.gold == 1500
     assert state.level == 8
     assert state.game_time == 420.0
-    assert state.champion_name == "Rumble"
+    assert state.champion_name == "럼블"
     assert state.creep_score == 64
     assert state.kills == 2
     assert state.items == ("Doran's Shield",)
+    assert state.position == "BOTTOM"
+    assert state.assigned_position == "BOTTOM"
+    assert state.ally_champions == ("럼블",)
+    assert state.enemy_champions == ("니달리", "갈리오")
+    assert state.all_champions == ("럼블", "니달리", "갈리오")
+    assert state.ally_gold == 2780
+    assert state.enemy_gold == 700
+    assert state.gold_diff == 2080
 
 
 @pytest.mark.asyncio

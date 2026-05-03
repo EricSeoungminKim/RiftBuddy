@@ -84,9 +84,11 @@ export function Overlay() {
       style={{
         width: 500,
         height: 420,
-        padding: 8,
+        padding: 10,
         boxSizing: "border-box",
         pointerEvents: "auto",
+        background: "linear-gradient(140deg, rgba(9,12,18,0.18), rgba(20,52,48,0.09))",
+        borderRadius: 10,
       }}
     >
       <StatusBar isConnected={isConnected} language={language} onLanguageChange={setLanguage} />
@@ -103,6 +105,7 @@ export function Overlay() {
             overflowY: "auto",
             paddingRight: 4,
             scrollbarWidth: "thin",
+            maskImage: "linear-gradient(to bottom, transparent 0, black 18px, black calc(100% - 10px), transparent 100%)",
           }}
         >
           {lastError && <AdviceCard role="system" text={lastError} />}

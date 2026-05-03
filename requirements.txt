@@ -3,7 +3,7 @@ uvicorn[standard]==0.46.0
 httpx==0.28.1
 anthropic==0.97.0
 elevenlabs==2.45.0
-faster-whisper==1.2.1
+openai-whisper==20250625
 sounddevice==0.5.5
 numpy==2.4.4
 supabase==2.29.0

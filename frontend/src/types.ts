@@ -25,4 +25,8 @@ export interface ListeningMessage {
   text: string;
 }
 
-export type ServerMessage = AdviceMessage | ErrorMessage | TranscriptMessage | ListeningMessage;
+export type ServerMessage =
+  | AdviceMessage
+  | ErrorMessage
+  | TranscriptMessage
+  | ListeningMessage;

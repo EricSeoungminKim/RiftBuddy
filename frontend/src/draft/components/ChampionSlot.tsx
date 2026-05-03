@@ -15,6 +15,8 @@ interface ChampionSlotProps {
   size?: number         // px, default 64
   onClick?: () => void
   selected?: boolean    // highlight ring
+  completed?: boolean
+  cellId?: number
 }
 
 export default function ChampionSlot({
@@ -24,6 +26,8 @@ export default function ChampionSlot({
   size = 64,
   onClick,
   selected = false,
+  completed = true,
+  cellId,
 }: ChampionSlotProps) {
   const [imgError, setImgError] = useState(false)
 
@@ -40,6 +44,7 @@ export default function ChampionSlot({
     flexDirection: 'column',
     alignItems: 'center',
     cursor: onClick ? 'pointer' : 'default',
+    opacity: championId && !completed ? 0.72 : 1,
   }
 
   const iconStyle: React.CSSProperties = {
@@ -53,6 +58,7 @@ export default function ChampionSlot({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    position: 'relative',
   }
 
   const placeholderStyle: React.CSSProperties = {
@@ -75,13 +81,28 @@ export default function ChampionSlot({
             style={{ objectFit: 'cover' }}
             onError={() => setImgError(true)}
           />
+          {!completed && (
+            <span style={{
+              position: 'absolute',
+              top: 3,
+              right: 3,
+              background: 'rgba(240,192,64,0.92)',
+              color: '#0d0e1a',
+              borderRadius: 3,
+              padding: '1px 4px',
+              fontSize: 9,
+              fontWeight: 800,
+            }}>
+              HOVER
+            </span>
+          )}
         </div>
       ) : (
         <div style={placeholderStyle}>?</div>
       )}
       {role && (
         <span style={{ fontSize: 11, color: '#aaa', marginTop: 2, textAlign: 'center' }}>
-          {role}
+          {role}{cellId !== undefined ? ` · ${cellId}` : ''}
         </span>
       )}
     </div>

@@ -25,6 +25,14 @@ class GameState:
     assists: int = 0
     creep_score: int = 0
     ward_score: float = 0.0
+    position: str = "UNKNOWN"
+    assigned_position: str = "UNKNOWN"
+    ally_champions: tuple[str, ...] = field(default_factory=tuple)
+    enemy_champions: tuple[str, ...] = field(default_factory=tuple)
+    all_champions: tuple[str, ...] = field(default_factory=tuple)
+    ally_gold: float = 0.0
+    enemy_gold: float = 0.0
+    gold_diff: float = 0.0
     items: tuple[str, ...] = field(default_factory=tuple)
     summoner_spells: tuple[str, ...] = field(default_factory=tuple)
     recent_events: tuple[str, ...] = field(default_factory=tuple)
@@ -45,6 +53,14 @@ def get_fake_game_state() -> GameState:
         assists=0,
         creep_score=72,
         ward_score=4.0,
+        position="TOP",
+        assigned_position="TOP",
+        ally_champions=("럼블",),
+        enemy_champions=("트린다미어", "갈리오", "다리우스", "브라움", "트리스타나"),
+        all_champions=("럼블", "트린다미어", "갈리오", "다리우스", "브라움", "트리스타나"),
+        ally_gold=12500,
+        enemy_gold=11000,
+        gold_diff=1500,
         items=("Doran's Shield", "Boots"),
         summoner_spells=("Flash", "Ignite"),
         recent_events=("MinionsSpawning at 0.5m",),
@@ -67,6 +83,8 @@ async def fetch_game_state() -> Optional[GameState]:
         player = data["activePlayer"]
         stats = player["championStats"]
         active_player = _find_active_player(data)
+        champion_groups = _extract_champion_groups(data, active_player)
+        gold_totals = _estimate_team_gold(data, active_player)
         return GameState(
             current_health=stats["currentHealth"],
             max_health=stats["maxHealth"],
@@ -81,6 +99,14 @@ async def fetch_game_state() -> Optional[GameState]:
             assists=active_player.get("scores", {}).get("assists", 0),
             creep_score=active_player.get("scores", {}).get("creepScore", 0),
             ward_score=active_player.get("scores", {}).get("wardScore", 0.0),
+            position=active_player.get("position", "UNKNOWN"),
+            assigned_position=active_player.get("position", "UNKNOWN"),
+            ally_champions=champion_groups["ally_champions"],
+            enemy_champions=champion_groups["enemy_champions"],
+            all_champions=champion_groups["all_champions"],
+            ally_gold=gold_totals["ally_gold"],
+            enemy_gold=gold_totals["enemy_gold"],
+            gold_diff=gold_totals["gold_diff"],
             items=_extract_item_names(active_player),
             summoner_spells=_extract_summoner_spells(active_player),
             recent_events=_extract_recent_events(data),
@@ -125,3 +151,56 @@ def _extract_recent_events(data: dict) -> tuple[str, ...]:
         for event in events
     ]
     return tuple(names)
+
+
+def _extract_champion_groups(data: dict, active_player: dict) -> dict[str, tuple[str, ...]]:
+    active_team = active_player.get("team")
+    allies: list[str] = []
+    enemies: list[str] = []
+    all_champions: list[str] = []
+
+    for player in data.get("allPlayers", []):
+        champion_name = player.get("championName")
+        if not champion_name:
+            continue
+        all_champions.append(champion_name)
+        if active_team and player.get("team") == active_team:
+            allies.append(champion_name)
+        elif active_team:
+            enemies.append(champion_name)
+
+    return {
+        "ally_champions": tuple(allies),
+        "enemy_champions": tuple(enemies),
+        "all_champions": tuple(all_champions),
+    }
+
+
+def _estimate_team_gold(data: dict, active_player: dict) -> dict[str, float]:
+    active_team = active_player.get("team")
+    ally_gold = 0.0
+    enemy_gold = 0.0
+
+    for player in data.get("allPlayers", []):
+        total_gold = _estimate_player_gold(player)
+        if active_team and player.get("team") == active_team:
+            ally_gold += total_gold
+        elif active_team:
+            enemy_gold += total_gold
+
+    return {
+        "ally_gold": ally_gold,
+        "enemy_gold": enemy_gold,
+        "gold_diff": ally_gold - enemy_gold,
+    }
+
+
+def _estimate_player_gold(player: dict) -> float:
+    item_gold = sum(float(item.get("price", 0) or item.get("itemGold", 0) or 0) for item in player.get("items", []))
+    scores = player.get("scores", {})
+    combat_gold = (
+        float(scores.get("kills", 0) or 0) * 300
+        + float(scores.get("assists", 0) or 0) * 150
+        + float(scores.get("creepScore", 0) or 0) * 20
+    )
+    return item_gold + combat_gold

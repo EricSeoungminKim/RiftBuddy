@@ -51,7 +51,7 @@ async def test_cache_expires_after_ttl():
     with patch("backend.draft.opgg_client._call_opgg_mcp", new_callable=AsyncMock, return_value=mock_response) as mock_call:
         await get_champion_analysis("Zed", "MID")
         # Manually expire cache
-        key = "champion_analysis:Zed:MID"
+        key = "champion_analysis:ZED:mid"
         old_ts, old_val = _cache[key]
         _cache[key] = (old_ts - CACHE_TTL_SECONDS - 1, old_val)
         await get_champion_analysis("Zed", "MID")

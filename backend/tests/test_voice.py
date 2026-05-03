@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import numpy as np
 import pytest
 
-from backend.voice.stt import contains_wake_word, transcribe_audio_chunk
+from backend.voice.stt import clean_transcript, contains_wake_word, is_valid_transcript, transcribe_audio_chunk
 from backend.voice.tts import text_to_speech_bytes
-from backend.voice.wake_word import _rms, _strip_wake_words
+from backend.voice.wake_word import SAMPLE_RATE, _record_question_until_silence, _rms, _strip_wake_words
 
 
 @pytest.mark.asyncio
@@ -63,15 +63,47 @@ def test_rms_detects_silence_and_speech():
 
 def test_transcribe_audio_chunk_returns_string():
     silent_audio = np.zeros(16000, dtype=np.float32)
-    segment = MagicMock()
-    segment.text = ""
     mock_model = MagicMock()
-    mock_model.transcribe.return_value = ([segment], None)
+    mock_model.transcribe.return_value = {"text": ""}
 
     with patch("backend.voice.stt._get_model", return_value=mock_model):
         result = transcribe_audio_chunk(silent_audio, language="ko", model_name="base")
 
     assert isinstance(result, str)
     mock_model.transcribe.assert_called_once()
-    assert mock_model.transcribe.call_args.args == (silent_audio,)
+    np.testing.assert_array_equal(mock_model.transcribe.call_args.args[0], silent_audio)
     assert mock_model.transcribe.call_args.kwargs["language"] == "ko"
+    assert mock_model.transcribe.call_args.kwargs["fp16"] is False
+    assert "initial_prompt" in mock_model.transcribe.call_args.kwargs
+
+
+def test_clean_transcript_removes_broken_noise_but_keeps_lol_terms():
+    assert clean_transcript("디� op� speaker CS 밀리는데 바텀 가도 돼?") == "디 CS 밀리는데 바텀 가도 돼?"
+
+
+def test_is_valid_transcript_rejects_empty_or_broken_noise():
+    assert is_valid_transcript("") is False
+    assert is_valid_transcript("op speaker") is False
+    assert is_valid_transcript("바텀 웨이브 밀어도 돼?") is True
+
+
+def test_record_question_keeps_minimum_audio_before_silence_stop():
+    silent_frame = np.zeros(int(SAMPLE_RATE * 0.25), dtype=np.float32).reshape(-1, 1)
+    speech_frame = np.ones(int(SAMPLE_RATE * 0.25), dtype=np.float32).reshape(-1, 1) * 0.2
+    frames = [speech_frame, silent_frame, silent_frame, silent_frame, silent_frame]
+
+    with patch.dict(
+        "backend.voice.wake_word.CONFIG",
+        {
+            "question_max_seconds": "1.25",
+            "question_min_seconds": "1.0",
+            "question_silence_seconds": "0.5",
+            "question_silence_threshold": "0.01",
+        },
+    ), patch("backend.voice.wake_word.sd.rec", side_effect=frames) as mock_rec, patch(
+        "backend.voice.wake_word.sd.wait"
+    ):
+        audio = _record_question_until_silence()
+
+    assert mock_rec.call_count == 4
+    assert audio.size == int(SAMPLE_RATE * 0.25) * 4

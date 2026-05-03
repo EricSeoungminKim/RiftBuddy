@@ -34,17 +34,19 @@ def _rms(audio: np.ndarray) -> float:
 
 def _record_question_until_silence() -> np.ndarray:
     max_seconds = float(CONFIG["question_max_seconds"])
+    min_seconds = float(CONFIG["question_min_seconds"])
     silence_seconds = float(CONFIG["question_silence_seconds"])
     silence_threshold = float(CONFIG["question_silence_threshold"])
     frame_samples = int(SAMPLE_RATE * QUESTION_FRAME_SECONDS)
     max_frames = max(1, int(max_seconds / QUESTION_FRAME_SECONDS))
+    min_frames = max(1, int(min_seconds / QUESTION_FRAME_SECONDS))
     max_silent_frames = max(1, int(silence_seconds / QUESTION_FRAME_SECONDS))
 
     frames: list[np.ndarray] = []
     silent_frames = 0
     speech_started = False
 
-    for _ in range(max_frames):
+    for frame_index in range(max_frames):
         frame = sd.rec(frame_samples, samplerate=SAMPLE_RATE, channels=1, dtype="float32")
         sd.wait()
         flat = frame.reshape(-1)
@@ -56,10 +58,10 @@ def _record_question_until_silence() -> np.ndarray:
         elif speech_started:
             silent_frames += 1
 
-        if speech_started:
+        if speech_started or frame_index < min_frames:
             frames.append(flat)
 
-        if speech_started and silent_frames >= max_silent_frames:
+        if frame_index + 1 >= min_frames and speech_started and silent_frames >= max_silent_frames:
             break
 
     if not frames:
@@ -127,3 +129,16 @@ async def run_wake_word_loop(
         except Exception as exc:
             logger.warning("Wake word listener error: %s", exc)
             await asyncio.sleep(2)
+
+
+async def capture_voice_question_once() -> str:
+    question_audio = await asyncio.to_thread(_record_question_until_silence)
+    if question_audio.size == 0:
+        return ""
+    question = await asyncio.to_thread(
+        transcribe_audio_chunk,
+        question_audio,
+        CONFIG["question_stt_language"],
+        CONFIG["question_stt_model"],
+    )
+    return _strip_wake_words(question)

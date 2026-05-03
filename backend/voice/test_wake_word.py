@@ -1,11 +1,11 @@
 import asyncio
 
-from backend.voice.wake_word import _record_chunk
-from backend.voice.stt import contains_wake_word, transcribe_audio_chunk
-from backend.config import CONFIG
-
 
 async def main() -> None:
+    from backend.config import CONFIG
+    from backend.voice.stt import contains_wake_word, transcribe_audio_chunk
+    from backend.voice.wake_word import _record_chunk
+
     print("Speak a wake phrase now. Recording 2 seconds...")
     audio = await asyncio.to_thread(_record_chunk)
     transcript = await asyncio.to_thread(

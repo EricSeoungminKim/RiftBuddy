@@ -9,25 +9,45 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-uvicorn backend.main:app --reload
+python3 -m uvicorn backend.main:app --reload --port 8001
 ```
 
 Health check:
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 ```
+
+LCU champion-select status check:
+
+```bash
+curl http://localhost:8001/lcu/champ-select/status
+```
+
+Expected states:
+
+- League closed: `200 OK` with `available: false`, `inProgress: false`
+- League open but not in champ select: `200 OK` with `available: true`, `inProgress: false`
+- Champ select active: `200 OK` with `available: true`, `inProgress: true`, plus `allySlots` / `enemySlots`
 
 ## Frontend
 
 ```bash
 cd frontend
 npm install
-NODE_ENV=development npm run dev
+npm run overlay
 ```
+
+Useful hotkeys:
+
+- `Command/Ctrl + Shift + D`: show/hide Draft Window
+- Draft Window auto-opens when champ select starts
+- `Command/Ctrl + Shift + B`: planned in-game advice
+- `Command/Ctrl + Shift + Space`: custom voice question
+- `Command/Ctrl + Shift + [` / `]`: switch overlay tabs
 
 ## Tests
 
 ```bash
-python -m pytest backend/tests -v
+python3 -m pytest -q
 ```

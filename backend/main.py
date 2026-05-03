@@ -6,7 +6,6 @@ from contextlib import suppress
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-from backend.auth.supabase_client import verify_token
 from backend.draft.router import router as draft_router
 from backend.lcu.router import router as lcu_router
 from backend.postgame.router import router as postgame_router
@@ -15,7 +14,7 @@ from backend.config import CONFIG
 from backend.context.engine import build_context_packet
 from backend.context.question_planner import build_planned_question
 from backend.llm.advisor import get_advice
-from backend.riot.live_client import fetch_game_state
+from backend.riot.live_client import fetch_game_state, GameState
 from backend.voice.stt import is_valid_transcript
 from backend.voice.tts import text_to_speech_bytes
 from backend.voice.wake_word import capture_voice_question_once, run_wake_word_loop
@@ -39,7 +38,7 @@ async def _stop_wake_word_task() -> None:
             await wake_word_task
 
 
-def _game_state_to_ws_payload(state) -> dict:
+def _game_state_to_ws_payload(state: GameState) -> dict:
     return {
         "type": "game_state",
         "gameTime": state.game_time,
@@ -80,8 +79,9 @@ async def _poll_game_state() -> None:
         for ws in list(active_websockets):
             try:
                 await ws.send_json(payload)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("WS broadcast failed, removing: %s", exc)
+                active_websockets.discard(ws)
 
 
 @asynccontextmanager
@@ -111,13 +111,7 @@ async def health():
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str = ""):
-    should_bypass_auth = CONFIG["test_mode"] == "1" or CONFIG["bypass_auth"] == "1"
-    user = {"id": "dev-user"} if should_bypass_auth else await verify_token(token) if token else None
-    if user is None:
-        await websocket.close(code=4001, reason="Unauthorized")
-        return
-
+async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     active_websockets.add(websocket)
     try:

@@ -72,7 +72,7 @@ export function useWebSocket() {
     };
   }, []);
 
-  const sendQuery = useCallback((query: string | null, language = "en") => {
+  const sendQuery = useCallback((query: string | null, language = "ko") => {
     if (ws.current?.readyState === WebSocket.OPEN) {
       if (query) {
         setMessages((items) => [...items.slice(-(MAX_MESSAGES - 1)), { role: "user", text: query }]);
@@ -81,5 +81,27 @@ export function useWebSocket() {
     }
   }, []);
 
-  return { lastAdvice, lastError, isConnected, audioQueue, messages, sendQuery, wsUrl: WS_URL };
+  const requestVoiceQuestion = useCallback((language = "ko") => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ action: "listen", language }));
+    }
+  }, []);
+
+  const requestPlannedAdvice = useCallback((language = "ko") => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ mode: "planned", query: null, language }));
+    }
+  }, []);
+
+  return {
+    lastAdvice,
+    lastError,
+    isConnected,
+    audioQueue,
+    messages,
+    sendQuery,
+    requestVoiceQuestion,
+    requestPlannedAdvice,
+    wsUrl: WS_URL
+  };
 }

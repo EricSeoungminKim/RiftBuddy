@@ -7,6 +7,9 @@ const isDev = process.env.NODE_ENV === "development";
 let overlayWin: BrowserWindow | null = null;
 let draftWin: BrowserWindow | null = null;
 let leagueTrackInterval: ReturnType<typeof setInterval> | null = null;
+let champSelectInterval: ReturnType<typeof setInterval> | null = null;
+let wasInChampSelect = false;
+const API_BASE = process.env.VITE_RIFTBUDDY_API_URL ?? "http://localhost:8001";
 
 function createOverlayWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -14,19 +17,24 @@ function createOverlayWindow(): BrowserWindow {
     height: 420,
     x: 1360,
     y: 90,
+    type: "panel",
     transparent: true,
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
+    focusable: false,
+    fullscreenable: false,
+    hasShadow: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, "preload.js"),
     },
   });
-  win.setAlwaysOnTop(true, "screen-saver");
+  win.setAlwaysOnTop(true, "screen-saver", 1);
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  win.setFocusable(false);
   win.setIgnoreMouseEvents(true, { forward: true });
 
   if (isDev) {
@@ -69,7 +77,12 @@ function createDraftWindow(): BrowserWindow {
   return win;
 }
 
-function getLeagueBoundsMac(): Promise<{ x: number; y: number; width: number; height: number } | null> {
+function getLeagueBoundsMac(): Promise<{
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} | null> {
   return new Promise((resolve) => {
     const script = `
       tell application "System Events"
@@ -91,7 +104,12 @@ function getLeagueBoundsMac(): Promise<{ x: number; y: number; width: number; he
   });
 }
 
-async function getLeagueBounds(): Promise<{ x: number; y: number; width: number; height: number } | null> {
+async function getLeagueBounds(): Promise<{
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} | null> {
   if (process.platform === "darwin") {
     return getLeagueBoundsMac();
   }
@@ -99,7 +117,10 @@ async function getLeagueBounds(): Promise<{ x: number; y: number; width: number;
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const getWindows = require("get-windows");
-      const windows: Array<{ title: string; bounds: { x: number; y: number; width: number; height: number } }> = await getWindows();
+      const windows: Array<{
+        title: string;
+        bounds: { x: number; y: number; width: number; height: number };
+      }> = await getWindows();
       const league = windows.find((w) => w.title === "League of Legends");
       return league?.bounds ?? null;
     } catch {
@@ -113,9 +134,38 @@ function startLeagueTracking(win: BrowserWindow): void {
   leagueTrackInterval = setInterval(async () => {
     const bounds = await getLeagueBounds();
     if (bounds) {
+      const width = 520;
+      const height = 420;
+      win.setBounds({
+        x: Math.max(bounds.x + 16, bounds.x + bounds.width - width - 28),
+        y: bounds.y + 72,
+        width,
+        height,
+      });
+      win.setAlwaysOnTop(true, "screen-saver", 1);
       win.webContents.send("riftbuddy:league-bounds", bounds);
     }
   }, 2000);
+}
+
+function startChampSelectTracking(): void {
+  champSelectInterval = setInterval(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/lcu/champ-select/status`);
+      if (!response.ok) {
+        wasInChampSelect = false;
+        return;
+      }
+      const data = await response.json();
+      if (data?.inProgress && !wasInChampSelect) {
+        wasInChampSelect = true;
+        draftWin?.show();
+        draftWin?.focus();
+      }
+    } catch {
+      wasInChampSelect = false;
+    }
+  }, 2500);
 }
 
 app.whenReady().then(() => {
@@ -123,6 +173,7 @@ app.whenReady().then(() => {
   draftWin = createDraftWindow();
 
   startLeagueTracking(overlayWin);
+  startChampSelectTracking();
 
   let currentTab = 0;
   const TAB_COUNT = 5;
@@ -171,5 +222,6 @@ app.whenReady().then(() => {
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
   if (leagueTrackInterval) clearInterval(leagueTrackInterval);
+  if (champSelectInterval) clearInterval(champSelectInterval);
 });
 app.on("window-all-closed", () => app.quit());

@@ -15,6 +15,9 @@ export interface MatchupGuide {
   myChampion: string
   enemyChampion: string
   role: string
+  slot?: number
+  winRate?: number
+  pickRate?: number
   advantage?: string
   tips?: string[]
   raw: unknown
@@ -35,6 +38,7 @@ export interface TeamStrategy {
 export interface DraftState {
   analysis: ChampionAnalysis | null
   matchup: MatchupGuide | null
+  matchups: Record<number, MatchupGuide>
   runes: RuneRecommendation | null
   teamStrategy: TeamStrategy | null
   loading: boolean
@@ -45,6 +49,7 @@ export function useDraftAnalysis() {
   const [state, setState] = useState<DraftState>({
     analysis: null,
     matchup: null,
+    matchups: {},
     runes: null,
     teamStrategy: null,
     loading: false,
@@ -74,15 +79,27 @@ export function useDraftAnalysis() {
     }
   }, [])
 
-  const fetchMatchup = useCallback(async (myChampion: string, enemyChampion: string, role: string) => {
+  const fetchMatchup = useCallback(async (myChampion: string, enemyChampion: string, role: string, slot?: number) => {
     setLoading(true)
     try {
       const res = await fetch(`${BASE}/draft/matchup?my_champion=${encodeURIComponent(myChampion)}&enemy_champion=${encodeURIComponent(enemyChampion)}&role=${encodeURIComponent(role)}`)
       if (!res.ok) throw new Error(`matchup ${res.status}`)
       const raw = await res.json()
+      const matchup = {
+        myChampion,
+        enemyChampion,
+        role,
+        slot,
+        raw,
+        winRate: extractNumber(raw, ['win_rate', 'winRate', 'winning_rate']),
+        pickRate: extractNumber(raw, ['pick_rate', 'pickRate']),
+        advantage: extractString(raw, ['advantage', 'laning_advantage', 'early_advantage']),
+        tips: extractStringArray(raw, ['tips', 'guide', 'summary']),
+      }
       setState(prev => ({
         ...prev,
-        matchup: { myChampion, enemyChampion, role, raw, advantage: raw.advantage, tips: raw.tips },
+        matchup,
+        matchups: slot === undefined ? prev.matchups : { ...prev.matchups, [slot]: matchup },
         loading: false,
         error: null,
       }))
@@ -161,8 +178,40 @@ export function useDraftAnalysis() {
   }, [])
 
   const reset = useCallback(() => {
-    setState({ analysis: null, matchup: null, runes: null, teamStrategy: null, loading: false, error: null })
+    setState({ analysis: null, matchup: null, matchups: {}, runes: null, teamStrategy: null, loading: false, error: null })
   }, [])
 
   return { ...state, fetchAnalysis, fetchMatchup, fetchRunes, fetchTeamStrategy, applyRunes, reset }
+}
+
+function extractNumber(raw: unknown, keys: string[]): number | undefined {
+  const value = findValue(raw, keys)
+  if (typeof value === 'number') return value > 1 ? value : value * 100
+  if (typeof value === 'string') {
+    const parsed = Number(value.replace('%', ''))
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+  return undefined
+}
+
+function extractString(raw: unknown, keys: string[]): string | undefined {
+  const value = findValue(raw, keys)
+  return typeof value === 'string' ? value : undefined
+}
+
+function extractStringArray(raw: unknown, keys: string[]): string[] | undefined {
+  const value = findValue(raw, keys)
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string')
+  if (typeof value === 'string') return [value]
+  return undefined
+}
+
+function findValue(raw: unknown, keys: string[]): unknown {
+  if (!raw || typeof raw !== 'object') return undefined
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (keys.includes(key)) return value
+    const nested = findValue(value, keys)
+    if (nested !== undefined) return nested
+  }
+  return undefined
 }

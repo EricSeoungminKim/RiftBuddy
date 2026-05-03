@@ -5,9 +5,9 @@ from unittest.mock import patch, AsyncMock
 from backend.postgame.router import router, game_session
 from backend.riot.live_client import GameState
 
-test_app = FastAPI()
-test_app.include_router(router)
-client = TestClient(test_app)
+postgame_app = FastAPI()
+postgame_app.include_router(router)
+client = TestClient(postgame_app)
 
 _SNAPSHOT_PAYLOAD = {
     "current_health": 1500.0,

@@ -6,7 +6,7 @@ import httpx
 
 OPGG_MCP_URL = "https://mcp-api.op.gg/mcp"
 
-# Official Korean display name → Riot champion ID (from DDragon ko_KR 14.9.1)
+# Official Korean display name → Riot champion ID (from DDragon ko_KR 16.9.1, 172 champions)
 KO_TO_EN: dict[str, str] = {
     "아트록스": "Aatrox", "아리": "Ahri", "아칼리": "Akali", "아크샨": "Akshan",
     "알리스타": "Alistar", "아무무": "Amumu", "애니비아": "Anivia", "애니": "Annie",
@@ -53,6 +53,7 @@ KO_TO_EN: dict[str, str] = {
     "야스오": "Yasuo", "요네": "Yone", "요릭": "Yorick", "유미": "Yuumi",
     "자크": "Zac", "제드": "Zed", "제리": "Zeri", "직스": "Ziggs",
     "질리언": "Zilean", "조이": "Zoe", "자이라": "Zyra",
+    "암베사": "Ambessa", "오로라": "Aurora", "멜": "Mel", "유나라": "Yunara", "자헨": "Zaahen",
 }
 CACHE_TTL_SECONDS = 600
 
@@ -120,11 +121,13 @@ _ANALYSIS_FIELDS = [
 
 
 def _normalize_champion(name: str) -> str:
-    # Korean name → English ID first
-    en = KO_TO_EN.get(name.strip()) or KO_TO_EN.get(name.strip().lower())
+    stripped = name.strip()
+    # Korean name → English DDragon ID
+    en = KO_TO_EN.get(stripped)
     if en:
         return en.upper()
-    return name.strip().upper().replace(" ", "_").replace("'", "")
+    # Already English (e.g. from LCU DDragon resolution) — uppercase as-is
+    return stripped.upper().replace(" ", "_").replace("'", "").replace(".", "")
 
 
 def _normalize_position(role: str) -> str:
@@ -166,16 +169,10 @@ async def get_matchup(my_champion: str, enemy_champion: str, role: str) -> dict:
 
 
 async def get_runes(champion: str, role: str) -> dict:
-    pos = _normalize_position(role)
-    champ = _normalize_champion(champion)
-    key = f"runes:{champ}:{pos}"
-    cached = _cache_get(key)
-    if cached is not None:
-        return cached
     data = await get_champion_analysis(champion, role)
-    runes = data.get("data", {}).get("runes", data.get("runes", {}))
-    _cache_set(key, runes)
-    return runes
+    if "data" in data or "runes" in data:
+        return data.get("data", {}).get("runes", data.get("runes", {}))
+    return data
 
 
 async def get_meta_champions(role: str) -> list:

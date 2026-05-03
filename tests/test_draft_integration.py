@@ -104,6 +104,7 @@ def test_apply_runes_route_exists():
         "subStyleId": 8100,
         "selectedPerkIds": [8005, 8008, 8014, 8017, 8299, 8304, 5005, 5008, 5002],
     }
-    resp = client.post("/lcu/apply-runes", json=payload)
+    with patch("backend.lcu.router._LOCKFILE_PATHS", {"darwin": None, "win32": None}):
+        resp = client.post("/lcu/apply-runes", json=payload)
     # 503 = lockfile not found (expected in CI), 200 = League client running
-    assert resp.status_code in (200, 503)
+    assert resp.status_code == 503

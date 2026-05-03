@@ -45,6 +45,8 @@ def load_config(require_env: bool = True) -> dict[str, str]:
         "question_max_seconds": os.getenv("RIFTBUDDY_QUESTION_MAX_SECONDS", "10"),
         "question_silence_seconds": os.getenv("RIFTBUDDY_QUESTION_SILENCE_SECONDS", "1.2"),
         "question_silence_threshold": os.getenv("RIFTBUDDY_QUESTION_SILENCE_THRESHOLD", "0.01"),
+        "question_prepare_seconds": os.getenv("RIFTBUDDY_QUESTION_PREPARE_SECONDS", "0.5"),
+        "question_min_seconds": os.getenv("RIFTBUDDY_QUESTION_MIN_SECONDS", "2.0"),
         "groq_api_key": os.getenv("GROQ_API_KEY", ""),
         "groq_model": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
         "gemini_api_key": os.getenv("GEMINI_API_KEY", ""),

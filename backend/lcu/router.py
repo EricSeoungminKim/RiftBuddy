@@ -1,5 +1,4 @@
 import base64
-import platform
 import sys
 from pathlib import Path
 
@@ -82,9 +81,38 @@ async def apply_runes(page: RunePage):
     return {"success": True, "message": f"Rune page '{page.name}' applied"}
 
 
+@router.get("/lcu/champ-select/status")
+async def champ_select_status():
+    """Poll-friendly champion select status that avoids noisy 503/404 logs."""
+    try:
+        return await _read_champ_select_state()
+    except HTTPException as exc:
+        if exc.status_code == 503:
+            return {
+                "available": False,
+                "inProgress": False,
+                "reason": "league_client_unavailable",
+                "message": exc.detail,
+            }
+        if exc.status_code == 404:
+            return {
+                "available": True,
+                "inProgress": False,
+                "reason": "not_in_champ_select",
+                "message": exc.detail,
+            }
+        raise
+
+
 @router.get("/lcu/champ-select")
 async def champ_select():
     """Return current champion select state: ally picks, enemy picks, local player cell."""
+    state = await _read_champ_select_state()
+    state.pop("available", None)
+    return state
+
+
+async def _read_champ_select_state() -> dict:
     info = _read_lockfile()
     port, password = info["port"], info["password"]
 
@@ -96,47 +124,83 @@ async def champ_select():
             raise HTTPException(status_code=502, detail="LCU error")
         session = resp.json()
 
+    champion_id_map = await _get_champion_id_map()
     my_cell = session.get("localPlayerCellId", -1)
-    ally_picks: list[dict] = []
-    enemy_picks: list[dict] = []
+    my_team_cells = {player.get("cellId") for player in session.get("myTeam", [])}
+    action_by_cell = _pick_actions_by_cell(session)
 
+    ally_slots = _team_slots(session.get("myTeam", []), action_by_cell, champion_id_map)
+    enemy_team = session.get("theirTeam", []) or _enemy_team_from_actions(action_by_cell, my_team_cells)
+    enemy_slots = _team_slots(enemy_team, action_by_cell, champion_id_map)
+    ally = [slot["champion"] for slot in ally_slots if slot.get("champion") and slot.get("completed")]
+    enemy = [slot["champion"] for slot in enemy_slots if slot.get("champion") and slot.get("completed")]
+
+    return {
+        "available": True,
+        "myCell": my_cell,
+        "ally": ally,
+        "enemy": enemy,
+        "allySlots": ally_slots,
+        "enemySlots": enemy_slots,
+        "inProgress": True,
+    }
+
+
+_champion_id_map_cache: dict[str, str] = {}
+
+
+async def _get_champion_id_map() -> dict[str, str]:
+    """Fetch champion int-id → English name from DDragon (cached per process)."""
+    if _champion_id_map_cache:
+        return _champion_id_map_cache
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        ver_resp = await client.get("https://ddragon.leagueoflegends.com/api/versions.json")
+        version = ver_resp.json()[0] if ver_resp.status_code == 200 else "16.9.1"
+        resp = await client.get(f"https://ddragon.leagueoflegends.com/cdn/{version}/data/en_US/champion.json")
+        if resp.status_code != 200:
+            return {}
+        data = resp.json()
+    _champion_id_map_cache.update({str(v["key"]): v["id"] for v in data["data"].values()})
+    return _champion_id_map_cache
+
+
+def _pick_actions_by_cell(session: dict) -> dict[int, dict]:
+    actions: dict[int, dict] = {}
     for action_group in session.get("actions", []):
         for action in action_group:
             if action.get("type") != "pick":
                 continue
             cell_id = action.get("actorCellId", -1)
             champion_id = action.get("championId", 0)
-            completed = action.get("completed", False)
-            if champion_id == 0:
+            if cell_id < 0 or not champion_id:
                 continue
-            entry = {"cellId": cell_id, "championId": champion_id, "completed": completed}
-            # Determine ally vs enemy by team membership
-            my_team = {p["cellId"] for p in session.get("myTeam", [])}
-            if cell_id in my_team:
-                ally_picks.append(entry)
-            else:
-                enemy_picks.append(entry)
-
-    # Resolve champion IDs to names via DDragon
-    champion_id_map = await _get_champion_id_map()
-
-    def resolve(picks: list[dict]) -> list[str]:
-        return [champion_id_map.get(str(p["championId"]), str(p["championId"])) for p in picks]
-
-    return {
-        "myCell": my_cell,
-        "ally": resolve(ally_picks),
-        "enemy": resolve(enemy_picks),
-        "inProgress": True,
-    }
+            existing = actions.get(cell_id)
+            if not existing or action.get("completed", False) or not existing.get("completed", False):
+                actions[cell_id] = action
+    return actions
 
 
-async def _get_champion_id_map() -> dict[str, str]:
-    """Fetch champion int-id → English name from DDragon."""
-    url = "https://ddragon.leagueoflegends.com/cdn/14.24.1/data/en_US/champion.json"
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        resp = await client.get(url)
-        if resp.status_code != 200:
-            return {}
-        data = resp.json()
-    return {str(v["key"]): v["id"] for v in data["data"].values()}
+def _team_slots(team: list[dict], action_by_cell: dict[int, dict], champion_id_map: dict[str, str]) -> list[dict]:
+    slots: list[dict] = []
+    for index, player in enumerate(team):
+        cell_id = player.get("cellId", index)
+        action = action_by_cell.get(cell_id, {})
+        champion_id = action.get("championId") or player.get("championId") or 0
+        champion = champion_id_map.get(str(champion_id), str(champion_id)) if champion_id else ""
+        slots.append(
+            {
+                "cellId": cell_id,
+                "slot": index,
+                "champion": champion,
+                "championId": champion_id,
+                "completed": bool(action.get("completed", False)),
+                "assignedPosition": player.get("assignedPosition") or player.get("position") or "",
+                "summonerId": player.get("summonerId"),
+            }
+        )
+    return slots
+
+
+def _enemy_team_from_actions(action_by_cell: dict[int, dict], my_team_cells: set[int]) -> list[dict]:
+    enemy_cells = sorted(cell_id for cell_id in action_by_cell if cell_id not in my_team_cells)
+    return [{"cellId": cell_id} for cell_id in enemy_cells[:5]]

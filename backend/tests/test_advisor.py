@@ -49,17 +49,33 @@ def test_get_mock_advice_low_health():
     assert len(advice) > 0
 
 
-def test_clean_response_language_replaces_common_english_terms_in_korean():
-    text = "Focus on CS and recall before enemy jungler arrives."
+def test_clean_response_language_keeps_korean_lol_terms():
+    text = "Focus on CS and KDA before bottom lane objective."
 
     cleaned = clean_response_language(text, "ko")
 
     assert "Focus" not in cleaned
-    assert "CS" not in cleaned
-    assert "recall" not in cleaned
+    assert "bottom lane" not in cleaned
     assert "집중하세요" in cleaned
-    assert "미니언 처치" in cleaned
-    assert "귀환" in cleaned
+    assert "CS" in cleaned
+    assert "KDA" in cleaned
+    assert "바텀" in cleaned
+    assert "오브젝트" in cleaned
+
+
+def test_clean_response_language_normalizes_lane_terms():
+    text = "Go bottom lane, then help jungle and support around middle lane."
+
+    cleaned = clean_response_language(text, "ko")
+
+    assert "bottom lane" not in cleaned
+    assert "jungle" not in cleaned
+    assert "support" not in cleaned
+    assert "middle lane" not in cleaned
+    assert "바텀" in cleaned
+    assert "정글" in cleaned
+    assert "서폿" in cleaned
+    assert "미드" in cleaned
 
 
 @pytest.mark.asyncio
@@ -123,9 +139,9 @@ async def test_get_groq_advice_uses_korean_only_system_prompt():
         advice = await get_groq_advice(packet, user_query="지금 뭐 해야 해?", language="ko")
 
     _, kwargs = mock_client.post.call_args
-    assert "Korean Hangul" in kwargs["json"]["messages"][0]["content"]
-    assert "CS" not in advice
-    assert "미니언 처치" in advice
+    assert "Korean League of Legends server terms" in kwargs["json"]["messages"][0]["content"]
+    assert "CS" in advice
+    assert "집중하세요" in advice
 
 
 @pytest.mark.asyncio
