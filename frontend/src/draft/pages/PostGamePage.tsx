@@ -1,8 +1,10 @@
 import React, { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { usePostGame } from '../hooks/usePostGame'
 
 export default function PostGamePage() {
   const { report, loading, error, fetchReport, clearSnapshots } = usePostGame()
+  const navigate = useNavigate()
 
   useEffect(() => {
     fetchReport()
@@ -92,6 +94,13 @@ export default function PostGamePage() {
           <span style={{ color: '#555' }}>게임이 끝나면 코칭 리포트가 자동으로 표시됩니다</span>
         </div>
       )}
+
+      <button
+        onClick={() => { clearSnapshots(); navigate('/') }}
+        style={{ background: '#3a8fd1', color: '#fff', border: 'none', borderRadius: 4, padding: '6px 18px', cursor: 'pointer', fontSize: 13, marginTop: 16, alignSelf: 'flex-start' }}
+      >
+        새 게임 시작
+      </button>
     </div>
   )
 }
