@@ -41,7 +41,11 @@ export interface DraftState {
   matchups: Record<number, MatchupGuide>
   runes: RuneRecommendation | null
   teamStrategy: TeamStrategy | null
+  recommendForRole: { recommendations: { champion: string; reason: string }[]; meta: string[] } | null
   loading: boolean
+  loadingRecommend: boolean
+  loadingMatchups: boolean
+  loadingStrategy: boolean
   error: string | null
 }
 
@@ -52,7 +56,11 @@ export function useDraftAnalysis() {
     matchups: {},
     runes: null,
     teamStrategy: null,
+    recommendForRole: null,
     loading: false,
+    loadingRecommend: false,
+    loadingMatchups: false,
+    loadingStrategy: false,
     error: null,
   })
 
@@ -80,7 +88,7 @@ export function useDraftAnalysis() {
   }, [])
 
   const fetchMatchup = useCallback(async (myChampion: string, enemyChampion: string, role: string, slot?: number) => {
-    setLoading(true)
+    setState(prev => ({ ...prev, loadingMatchups: true }))
     try {
       const res = await fetch(`${BASE}/draft/matchup?my_champion=${encodeURIComponent(myChampion)}&enemy_champion=${encodeURIComponent(enemyChampion)}&role=${encodeURIComponent(role)}`)
       if (!res.ok) throw new Error(`matchup ${res.status}`)
@@ -100,10 +108,11 @@ export function useDraftAnalysis() {
         ...prev,
         matchup,
         matchups: slot === undefined ? prev.matchups : { ...prev.matchups, [slot]: matchup },
-        loading: false,
+        loadingMatchups: false,
         error: null,
       }))
     } catch (e) {
+      setState(prev => ({ ...prev, loadingMatchups: false }))
       setError(String(e))
     }
   }, [])
@@ -137,7 +146,7 @@ export function useDraftAnalysis() {
     myChampion: string,
     myRole: string,
   ) => {
-    setLoading(true)
+    setState(prev => ({ ...prev, loadingStrategy: true }))
     try {
       const res = await fetch(`${BASE}/draft/team-strategy`, {
         method: 'POST',
@@ -149,11 +158,28 @@ export function useDraftAnalysis() {
       setState(prev => ({
         ...prev,
         teamStrategy: { strategy: data.strategy },
-        loading: false,
+        loadingStrategy: false,
         error: null,
       }))
     } catch (e) {
+      setState(prev => ({ ...prev, loadingStrategy: false }))
       setError(String(e))
+    }
+  }, [])
+
+  const fetchRecommendForRole = useCallback(async (ally: string[], enemy: string[], myRole: string, language = 'ko') => {
+    setState(prev => ({ ...prev, loadingRecommend: true }))
+    try {
+      const res = await fetch(`${BASE}/draft/recommend-for-role`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ally, enemy, my_role: myRole, language }),
+      })
+      if (!res.ok) throw new Error(`recommend-for-role ${res.status}`)
+      const data = await res.json()
+      setState(prev => ({ ...prev, recommendForRole: data, loadingRecommend: false }))
+    } catch (e) {
+      setState(prev => ({ ...prev, loadingRecommend: false }))
     }
   }, [])
 
@@ -178,10 +204,10 @@ export function useDraftAnalysis() {
   }, [])
 
   const reset = useCallback(() => {
-    setState({ analysis: null, matchup: null, matchups: {}, runes: null, teamStrategy: null, loading: false, error: null })
+    setState({ analysis: null, matchup: null, matchups: {}, runes: null, teamStrategy: null, recommendForRole: null, loading: false, loadingRecommend: false, loadingMatchups: false, loadingStrategy: false, error: null })
   }, [])
 
-  return { ...state, fetchAnalysis, fetchMatchup, fetchRunes, fetchTeamStrategy, applyRunes, reset }
+  return { ...state, fetchAnalysis, fetchMatchup, fetchRunes, fetchTeamStrategy, fetchRecommendForRole, applyRunes, reset }
 }
 
 function extractNumber(raw: unknown, keys: string[]): number | undefined {
