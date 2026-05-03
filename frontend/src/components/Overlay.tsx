@@ -4,12 +4,9 @@ import { AdviceCard } from "./AdviceCard";
 import { StatusBar } from "./StatusBar";
 import { TabBar } from "./overlay/TabBar";
 
-const TAB_AI = 0;
-
 export function Overlay() {
   const { lastError, isConnected, audioQueue, messages, requestVoiceQuestion, requestPlannedAdvice } = useWebSocket();
   const [language, setLanguage] = useState((import.meta.env.VITE_RIFTBUDDY_RESPONSE_LANGUAGE as string) ?? "ko");
-  const [activeTab, setActiveTab] = useState(TAB_AI);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -39,15 +36,11 @@ export function Overlay() {
   }, [language, requestPlannedAdvice, requestVoiceQuestion]);
 
   useEffect(() => {
-    return window.riftBuddy?.onRequestAdvice(() => {
-      requestPlannedAdvice(language);
-    });
+    return window.riftBuddy?.onRequestAdvice(() => requestPlannedAdvice(language));
   }, [language, requestPlannedAdvice]);
 
   useEffect(() => {
-    return window.riftBuddy?.onRequestVoiceQuestion(() => {
-      requestVoiceQuestion(language);
-    });
+    return window.riftBuddy?.onRequestVoiceQuestion(() => requestVoiceQuestion(language));
   }, [language, requestVoiceQuestion]);
 
   useEffect(() => {
@@ -57,16 +50,7 @@ export function Overlay() {
   }, []);
 
   useEffect(() => {
-    return window.riftBuddy?.onTabSwitch?.((tabIndex: number) => {
-      setActiveTab(tabIndex);
-    });
-  }, []);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
-    });
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [lastError, messages]);
 
   return (
@@ -82,28 +66,25 @@ export function Overlay() {
       }}
     >
       <StatusBar isConnected={isConnected} language={language} onLanguageChange={setLanguage} />
-      <TabBar active={activeTab} onSwitch={setActiveTab} />
-
-      {activeTab === TAB_AI && (
-        <div
-          ref={scrollRef}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 6,
-            maxHeight: 360,
-            overflowY: "auto",
-            paddingRight: 4,
-            scrollbarWidth: "thin",
-            maskImage: "linear-gradient(to bottom, transparent 0, black 18px, black calc(100% - 10px), transparent 100%)",
-          }}
-        >
-          {lastError && <AdviceCard role="system" text={lastError} />}
-          {messages.map((message, index) => (
-            <AdviceCard key={`${message.role}-${index}-${message.text}`} role={message.role} text={message.text} />
-          ))}
-        </div>
-      )}
+      <TabBar />
+      <div
+        ref={scrollRef}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+          maxHeight: 360,
+          overflowY: "auto",
+          paddingRight: 4,
+          scrollbarWidth: "thin",
+          maskImage: "linear-gradient(to bottom, transparent 0, black 18px, black calc(100% - 10px), transparent 100%)",
+        }}
+      >
+        {lastError && <AdviceCard role="system" text={lastError} />}
+        {messages.map((message, index) => (
+          <AdviceCard key={`${message.role}-${index}-${message.text}`} role={message.role} text={message.text} />
+        ))}
+      </div>
     </div>
   );
 }

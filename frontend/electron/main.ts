@@ -175,19 +175,6 @@ app.whenReady().then(() => {
   startLeagueTracking(overlayWin);
   startChampSelectTracking();
 
-  let currentTab = 0;
-  const TAB_COUNT = 5;
-
-  globalShortcut.register("CommandOrControl+Shift+]", () => {
-    currentTab = (currentTab + 1) % TAB_COUNT;
-    overlayWin?.webContents.send("riftbuddy:tab-switch", currentTab);
-  });
-
-  globalShortcut.register("CommandOrControl+Shift+[", () => {
-    currentTab = (currentTab - 1 + TAB_COUNT) % TAB_COUNT;
-    overlayWin?.webContents.send("riftbuddy:tab-switch", currentTab);
-  });
-
   globalShortcut.register("CommandOrControl+Shift+B", () => {
     overlayWin?.webContents.send("riftbuddy:request-advice");
   });
@@ -204,18 +191,6 @@ app.whenReady().then(() => {
       draftWin?.show();
       draftWin?.focus();
     }
-  });
-  globalShortcut.register("CommandOrControl+Shift+,", () => {
-    if (!overlayWin) return;
-    overlayWin.setIgnoreMouseEvents(false);
-    overlayWin.webContents.send("riftbuddy:settings-mode");
-    setTimeout(() => {
-      overlayWin?.setIgnoreMouseEvents(true, { forward: true });
-    }, 5000);
-  });
-
-  ipcMain.on("riftbuddy:exit-settings-mode", () => {
-    overlayWin?.setIgnoreMouseEvents(true, { forward: true });
   });
 });
 
