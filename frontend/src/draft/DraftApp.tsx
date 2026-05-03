@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react'
 import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom'
 import DraftPage from './pages/DraftPage'
-import PostLockInPage from './pages/PostLockInPage'
 import PostGamePage from './pages/PostGamePage'
 
 function GameEndListener() {
@@ -31,7 +30,6 @@ export default function DraftApp() {
       <GameEndListener />
       <Routes>
         <Route path="/" element={<DraftPage />} />
-        <Route path="/post-lock-in" element={<PostLockInPage />} />
         <Route path="/postgame" element={<PostGamePage />} />
       </Routes>
     </HashRouter>

@@ -1,26 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useWebSocket } from "../hooks/useWebSocket";
-import { useGameEvents } from "../hooks/useGameEvents";
 import { AdviceCard } from "./AdviceCard";
 import { StatusBar } from "./StatusBar";
 import { TabBar } from "./overlay/TabBar";
-import { TimersTab } from "./overlay/TimersTab";
-import { GoldTab } from "./overlay/GoldTab";
-import { BuffsTab } from "./overlay/BuffsTab";
-import { UltsTab } from "./overlay/UltsTab";
 
 const TAB_AI = 0;
-const TAB_TIMERS = 1;
-const TAB_GOLD = 2;
-const TAB_BUFFS = 3;
-const TAB_ULTS = 4;
 
 export function Overlay() {
   const { lastError, isConnected, audioQueue, messages, requestVoiceQuestion, requestPlannedAdvice } = useWebSocket();
   const [language, setLanguage] = useState((import.meta.env.VITE_RIFTBUDDY_RESPONSE_LANGUAGE as string) ?? "ko");
   const [activeTab, setActiveTab] = useState(TAB_AI);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const gameEvents = useGameEvents(messages);
 
   useEffect(() => {
     if (audioQueue.length === 0) return;
@@ -113,28 +103,6 @@ export function Overlay() {
             <AdviceCard key={`${message.role}-${index}-${message.text}`} role={message.role} text={message.text} />
           ))}
         </div>
-      )}
-
-      {activeTab === TAB_TIMERS && (
-        <TimersTab objectives={gameEvents.objectives} gameTime={gameEvents.gameTime} />
-      )}
-
-      {activeTab === TAB_GOLD && (
-        <GoldTab
-          allyGold={gameEvents.allyGold}
-          enemyGold={gameEvents.enemyGold}
-          goldDiff={gameEvents.goldDiff}
-          allyChampions={gameEvents.allyChampions}
-          enemyChampions={gameEvents.enemyChampions}
-        />
-      )}
-
-      {activeTab === TAB_BUFFS && (
-        <BuffsTab buffs={gameEvents.buffs} gameTime={gameEvents.gameTime} />
-      )}
-
-      {activeTab === TAB_ULTS && (
-        <UltsTab ults={gameEvents.ults} gameTime={gameEvents.gameTime} />
       )}
     </div>
   );
