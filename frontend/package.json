@@ -4,8 +4,9 @@
   "private": true,
   "main": "dist/main.js",
   "scripts": {
-    "dev": "tsc -p tsconfig.electron.json && concurrently \"vite\" \"wait-on http://localhost:5173 && NODE_ENV=development electron .\"",
-    "overlay": "tsc -p tsconfig.electron.json && concurrently \"vite\" \"wait-on http://localhost:5173 && NODE_ENV=development RIFTBUDDY_OVERLAY=1 electron .\"",
+    "dev": "tsc -p tsconfig.electron.json && concurrently \"vite\" \"wait-on http://localhost:5173 && NODE_ENV=development VITE_RIFTBUDDY_API_URL=http://127.0.0.1:8001 VITE_RIFTBUDDY_WS_URL=ws://127.0.0.1:8001/ws electron .\"",
+    "overlay": "tsc -p tsconfig.electron.json && concurrently \"vite\" \"wait-on http://localhost:5173 && NODE_ENV=development RIFTBUDDY_OVERLAY=1 VITE_RIFTBUDDY_API_URL=http://127.0.0.1:8001 VITE_RIFTBUDDY_WS_URL=ws://127.0.0.1:8001/ws electron .\"",
+    "test": "tsc -p tsconfig.tests.json && node --test /private/tmp/riftbuddy-frontend-tests/tests/*.test.js",
     "build": "vite build && tsc -p tsconfig.electron.json",
     "electron:pack": "electron-builder"
   },

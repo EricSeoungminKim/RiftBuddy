@@ -1,4 +1,5 @@
 import json as _json
+import re
 import time
 from typing import Any
 
@@ -90,8 +91,57 @@ async def _call_opgg_mcp(tool: str, arguments: dict) -> dict:
         content = result["content"]
         if isinstance(content, list) and content:
             raw = content[0].get("text", "{}")
-            return _json.loads(raw) if isinstance(raw, str) else raw
+            if not isinstance(raw, str):
+                return raw
+            try:
+                return _json.loads(raw)
+            except _json.JSONDecodeError:
+                parsed = _parse_champion_analysis_text(raw)
+                return parsed or {"raw_text": raw}
     return result
+
+
+def _parse_champion_analysis_text(raw: str) -> dict:
+    counter_lists = re.findall(r"\[((?:StrongCounter\(\"[^\"]+\",[0-9.]+\),?)+)\]", raw)
+    if not counter_lists and "AverageStats(" not in raw:
+        return {}
+
+    data: dict[str, Any] = {}
+    average_match = re.search(r"AverageStats\([^,]+,[^,]+,([0-9.]+),([^,]+),TierData\(([^,]+),([^)]+)\)\)", raw)
+    if average_match:
+        data["summary"] = {
+            "average_stats": {
+                "win_rate": float(average_match.group(1)),
+                "tier": _parse_scalar(average_match.group(2)),
+                "tier_data": {
+                    "rank": _parse_scalar(average_match.group(3)),
+                    "tier": _parse_scalar(average_match.group(4)),
+                },
+            }
+        }
+
+    if counter_lists:
+        data["strong_counters"] = _parse_counter_list(counter_lists[0])
+    if len(counter_lists) > 1:
+        data["weak_counters"] = _parse_counter_list(counter_lists[1])
+
+    return {"data": data, "raw_text": raw}
+
+
+def _parse_counter_list(raw: str) -> list[dict]:
+    return [
+        {"champion_name": champion, "win_rate": float(win_rate)}
+        for champion, win_rate in re.findall(r'StrongCounter\("([^"]+)",([0-9.]+)\)', raw)
+    ]
+
+
+def _parse_scalar(value: str) -> int | float | str:
+    stripped = value.strip().strip('"')
+    try:
+        number = float(stripped)
+    except ValueError:
+        return stripped
+    return int(number) if number.is_integer() else number
 
 
 _POSITION_MAP = {

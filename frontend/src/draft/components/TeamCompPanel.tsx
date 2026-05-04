@@ -13,19 +13,20 @@ const cardStyle: React.CSSProperties = {
   padding: 14,
   flex: 1,
   minWidth: 0,
+  minHeight: 0,
+  height: '100%',
   overflowY: 'auto',
-  maxHeight: 280,
 }
 
 export default function TeamCompPanel({ strategy, loading }: Props) {
   return (
     <div style={cardStyle}>
       <div style={{ fontSize: 11, color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
-        팀 조합 분석
+        Team comp plan
       </div>
-      {loading && <div style={{ color: '#888', fontSize: 12 }}>분석 중...</div>}
+      {loading && <div style={{ color: '#888', fontSize: 12 }}>Building draft plan...</div>}
       {!loading && !strategy && (
-        <div style={{ color: '#555', fontSize: 12 }}>아군 챔피언이 2명 이상 선택되면 자동으로 팀 시너지를 분석합니다</div>
+        <div style={{ color: '#555', fontSize: 12 }}>After all 10 picks lock in, RiftBuddy uses the comps and OP.GG matchup evidence to build the fight and macro plan.</div>
       )}
       {strategy && (
         <p style={{ fontSize: 13, lineHeight: 1.7, color: '#ccc', margin: 0, whiteSpace: 'pre-wrap' }}>

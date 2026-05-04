@@ -1,12 +1,5 @@
-import React, { useState } from 'react'
-
-const DDRAGON_VERSION = '14.9.1'
-const DDRAGON_BASE = `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/champion`
-
-function championIconUrl(championId: string): string {
-  // DDragon expects PascalCase champion IDs e.g. "Ahri", "DrMundo", "Kaisa"
-  return `${DDRAGON_BASE}/${championId}.png`
-}
+import React, { useEffect, useState } from 'react'
+import { championIconUrl } from '../championAssets'
 
 interface ChampionSlotProps {
   championId?: string   // e.g. "Ahri", "Zed". undefined = empty slot
@@ -31,6 +24,10 @@ export default function ChampionSlot({
 }: ChampionSlotProps) {
   const [imgError, setImgError] = useState(false)
 
+  useEffect(() => {
+    setImgError(false)
+  }, [championId])
+
   const borderColor = selected
     ? '#f0c040'
     : isAlly
@@ -45,6 +42,10 @@ export default function ChampionSlot({
     alignItems: 'center',
     cursor: onClick ? 'pointer' : 'default',
     opacity: championId && !completed ? 0.72 : 1,
+    padding: 0,
+    border: 'none',
+    background: 'transparent',
+    font: 'inherit',
   }
 
   const iconStyle: React.CSSProperties = {
@@ -69,8 +70,8 @@ export default function ChampionSlot({
     userSelect: 'none',
   }
 
-  return (
-    <div style={containerStyle} onClick={onClick}>
+  const content = (
+    <>
       {championId && !imgError ? (
         <div style={iconStyle}>
           <img
@@ -105,6 +106,16 @@ export default function ChampionSlot({
           {role}{cellId !== undefined ? ` · ${cellId}` : ''}
         </span>
       )}
-    </div>
+    </>
   )
+
+  if (onClick) {
+    return (
+      <button type="button" style={containerStyle} onClick={onClick} aria-label={championId ? `Select ${championId}` : 'Select empty champion slot'}>
+        {content}
+      </button>
+    )
+  }
+
+  return <div style={containerStyle}>{content}</div>
 }

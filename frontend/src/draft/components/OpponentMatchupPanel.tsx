@@ -1,5 +1,6 @@
 import React from 'react'
 import { MatchupGuide } from '../hooks/useDraftAnalysis'
+import { matchupForEnemy } from '../automation'
 
 interface Props {
   recommendedChampion: string
@@ -16,6 +17,9 @@ const cardStyle: React.CSSProperties = {
   padding: 14,
   flex: 1,
   minWidth: 0,
+  minHeight: 0,
+  height: '100%',
+  overflowY: 'auto',
 }
 
 function winRateColor(wr: number | undefined): string {
@@ -30,20 +34,20 @@ export default function OpponentMatchupPanel({ recommendedChampion, enemyChampio
   return (
     <div style={cardStyle}>
       <div style={{ fontSize: 11, color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
-        상대 챔피언 승률 {recommendedChampion ? `vs ${recommendedChampion}` : ''}
+        Enemy matchup win rates {recommendedChampion ? `vs ${recommendedChampion}` : ''}
       </div>
-      {loading && <div style={{ color: '#888', fontSize: 12 }}>불러오는 중...</div>}
+      {loading && <div style={{ color: '#888', fontSize: 12 }}>Loading OP.GG matchup data...</div>}
       {!loading && filled.length === 0 && (
-        <div style={{ color: '#555', fontSize: 12 }}>상대 챔피언이 픽되면 승률이 표시됩니다</div>
+        <div style={{ color: '#555', fontSize: 12 }}>Enemy matchup win rates appear as enemy picks lock in.</div>
       )}
       {filled.map((enemy) => {
-        const matchup = Object.values(matchups).find(m => m.enemyChampion === enemy)
+        const matchup = matchupForEnemy(matchups, recommendedChampion, enemy)
         const wr = matchup?.winRate
         return (
           <div key={enemy} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ color: '#e05050', fontSize: 13 }}>{enemy}</span>
             <span style={{ color: winRateColor(wr), fontWeight: 700, fontSize: 14 }}>
-              {wr !== undefined ? `${wr.toFixed(1)}%` : loading ? '...' : 'N/A'}
+              {wr !== undefined ? `${wr.toFixed(1)}%` : loading ? '…' : 'N/A'}
             </span>
           </div>
         )

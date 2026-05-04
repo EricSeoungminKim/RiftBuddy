@@ -1,6 +1,7 @@
 import { app, BrowserWindow, globalShortcut } from "electron";
 import { exec } from "child_process";
 import path from "path";
+import { nextChampSelectVisibilityState } from "./champSelectTracking";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -9,7 +10,17 @@ let draftWin: BrowserWindow | null = null;
 let leagueTrackInterval: ReturnType<typeof setInterval> | null = null;
 let champSelectInterval: ReturnType<typeof setInterval> | null = null;
 let wasInChampSelect = false;
-const API_BASE = process.env.VITE_RIFTBUDDY_API_URL ?? "http://localhost:8001";
+let lastChampSelectDebugKey = "";
+const API_BASE = process.env.VITE_RIFTBUDDY_API_URL ?? "http://127.0.0.1:8001";
+
+function logChampSelectState(inProgress: boolean, draftVisible: boolean): void {
+  const key = `${inProgress}:${draftVisible}`;
+  if (key === lastChampSelectDebugKey) return;
+  lastChampSelectDebugKey = key;
+  console.log(
+    `RiftBuddy champ-select poll: inProgress=${inProgress} draftVisible=${draftVisible} api=${API_BASE}`,
+  );
+}
 
 function createOverlayWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -60,8 +71,9 @@ function createDraftWindow(): BrowserWindow {
       preload: path.join(__dirname, "preload.js"),
     },
   });
-  win.setAlwaysOnTop(true, "floating");
+  win.setAlwaysOnTop(true, "screen-saver", 1);
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  win.setFullScreenable(false);
 
   if (isDev) {
     win.loadURL("http://localhost:5173/src/draft/draft.html");
@@ -149,23 +161,39 @@ function startLeagueTracking(win: BrowserWindow): void {
 }
 
 function startChampSelectTracking(): void {
-  champSelectInterval = setInterval(async () => {
+  const poll = async () => {
     try {
       const response = await fetch(`${API_BASE}/lcu/champ-select/status`);
       if (!response.ok) {
+        console.log(`RiftBuddy champ-select poll failed: HTTP ${response.status}`);
         wasInChampSelect = false;
         return;
       }
       const data = await response.json();
-      if (data?.inProgress && !wasInChampSelect) {
-        wasInChampSelect = true;
+      const draftVisible = Boolean(draftWin?.isVisible());
+      logChampSelectState(Boolean(data?.inProgress), draftVisible);
+      const nextState = nextChampSelectVisibilityState(
+        Boolean(data?.inProgress),
+        wasInChampSelect,
+        draftVisible,
+      );
+      wasInChampSelect = nextState.wasInChampSelect;
+      if (nextState.shouldShowDraft) {
+        console.log("RiftBuddy Draft auto-open: champion select detected");
+        draftWin?.setAlwaysOnTop(true, "screen-saver", 1);
+        app.focus({ steal: true });
+        draftWin?.showInactive();
         draftWin?.show();
+        draftWin?.moveTop();
         draftWin?.focus();
       }
-    } catch {
+    } catch (error) {
+      console.log(`RiftBuddy champ-select poll error: ${error instanceof Error ? error.message : String(error)}`);
       wasInChampSelect = false;
     }
-  }, 2500);
+  };
+  void poll();
+  champSelectInterval = setInterval(poll, 2500);
 }
 
 app.whenReady().then(() => {
@@ -188,7 +216,11 @@ app.whenReady().then(() => {
     if (draftWin?.isVisible()) {
       draftWin.hide();
     } else {
+      draftWin?.setAlwaysOnTop(true, "screen-saver", 1);
+      app.focus({ steal: true });
+      draftWin?.showInactive();
       draftWin?.show();
+      draftWin?.moveTop();
       draftWin?.focus();
     }
   });

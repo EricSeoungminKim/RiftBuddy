@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { matchupWinRateFromResponse } from '../automation'
 
 const BASE = import.meta.env.VITE_RIFTBUDDY_API_URL ?? 'http://localhost:8001'
 
@@ -35,17 +36,26 @@ export interface TeamStrategy {
   strategy: string
 }
 
+export interface BanCounter {
+  champion: string
+  winRate?: number
+  reason: string
+  source: string
+}
+
 export interface DraftState {
   analysis: ChampionAnalysis | null
   matchup: MatchupGuide | null
   matchups: Record<number, MatchupGuide>
   runes: RuneRecommendation | null
   teamStrategy: TeamStrategy | null
-  recommendForRole: { recommendations: { champion: string; reason: string }[]; meta: string[] } | null
+  banCounters: { target: string; counters: BanCounter[] } | null
+  recommendForRole: { recommendations: { champion: string; reason: string; winRate?: number; source?: string }[]; meta: string[] } | null
   loading: boolean
   loadingRecommend: boolean
   loadingMatchups: boolean
   loadingStrategy: boolean
+  loadingBanCounters: boolean
   error: string | null
 }
 
@@ -56,11 +66,13 @@ export function useDraftAnalysis() {
     matchups: {},
     runes: null,
     teamStrategy: null,
+    banCounters: null,
     recommendForRole: null,
     loading: false,
     loadingRecommend: false,
     loadingMatchups: false,
     loadingStrategy: false,
+    loadingBanCounters: false,
     error: null,
   })
 
@@ -99,7 +111,7 @@ export function useDraftAnalysis() {
         role,
         slot,
         raw,
-        winRate: extractNumber(raw, ['win_rate', 'winRate', 'winning_rate']),
+        winRate: matchupWinRateFromResponse(raw),
         pickRate: extractNumber(raw, ['pick_rate', 'pickRate']),
         advantage: extractString(raw, ['advantage', 'laning_advantage', 'early_advantage']),
         tips: extractStringArray(raw, ['tips', 'guide', 'summary']),
@@ -145,13 +157,14 @@ export function useDraftAnalysis() {
     enemy: string[],
     myChampion: string,
     myRole: string,
+    matchups: MatchupGuide[] = [],
   ) => {
     setState(prev => ({ ...prev, loadingStrategy: true }))
     try {
       const res = await fetch(`${BASE}/draft/team-strategy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ally, enemy, my_champion: myChampion, my_role: myRole }),
+        body: JSON.stringify({ ally, enemy, my_champion: myChampion, my_role: myRole, matchups }),
       })
       if (!res.ok) throw new Error(`team-strategy ${res.status}`)
       const data = await res.json()
@@ -167,7 +180,7 @@ export function useDraftAnalysis() {
     }
   }, [])
 
-  const fetchRecommendForRole = useCallback(async (ally: string[], enemy: string[], myRole: string, language = 'ko') => {
+  const fetchRecommendForRole = useCallback(async (ally: string[], enemy: string[], myRole: string, language = 'en') => {
     setState(prev => ({ ...prev, loadingRecommend: true }))
     try {
       const res = await fetch(`${BASE}/draft/recommend-for-role`, {
@@ -180,6 +193,20 @@ export function useDraftAnalysis() {
       setState(prev => ({ ...prev, recommendForRole: data, loadingRecommend: false }))
     } catch (e) {
       setState(prev => ({ ...prev, loadingRecommend: false }))
+    }
+  }, [])
+
+  const fetchBanCounters = useCallback(async (champion: string, role: string) => {
+    setState(prev => ({ ...prev, loadingBanCounters: true }))
+    try {
+      const championQuery = champion ? `&champion=${encodeURIComponent(champion)}` : ''
+      const res = await fetch(`${BASE}/draft/ban-counters?role=${encodeURIComponent(role)}${championQuery}`)
+      if (!res.ok) throw new Error(`ban-counters ${res.status}`)
+      const data = await res.json()
+      setState(prev => ({ ...prev, banCounters: data, loadingBanCounters: false, error: null }))
+    } catch (e) {
+      setState(prev => ({ ...prev, loadingBanCounters: false }))
+      setError(String(e))
     }
   }, [])
 
@@ -204,10 +231,10 @@ export function useDraftAnalysis() {
   }, [])
 
   const reset = useCallback(() => {
-    setState({ analysis: null, matchup: null, matchups: {}, runes: null, teamStrategy: null, recommendForRole: null, loading: false, loadingRecommend: false, loadingMatchups: false, loadingStrategy: false, error: null })
+    setState({ analysis: null, matchup: null, matchups: {}, runes: null, teamStrategy: null, banCounters: null, recommendForRole: null, loading: false, loadingRecommend: false, loadingMatchups: false, loadingStrategy: false, loadingBanCounters: false, error: null })
   }, [])
 
-  return { ...state, fetchAnalysis, fetchMatchup, fetchRunes, fetchTeamStrategy, fetchRecommendForRole, applyRunes, reset }
+  return { ...state, fetchAnalysis, fetchMatchup, fetchRunes, fetchTeamStrategy, fetchRecommendForRole, fetchBanCounters, applyRunes, reset }
 }
 
 function extractNumber(raw: unknown, keys: string[]): number | undefined {
@@ -234,8 +261,11 @@ function extractStringArray(raw: unknown, keys: string[]): string[] | undefined 
 
 function findValue(raw: unknown, keys: string[]): unknown {
   if (!raw || typeof raw !== 'object') return undefined
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    if (keys.includes(key)) return value
+  const record = raw as Record<string, unknown>
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(record, key)) return record[key]
+  }
+  for (const value of Object.values(record)) {
     const nested = findValue(value, keys)
     if (nested !== undefined) return nested
   }

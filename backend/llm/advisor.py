@@ -9,9 +9,12 @@ from backend.context.engine import ContextPacket
 
 anthropic_client = anthropic.AsyncAnthropic(api_key=CONFIG["anthropic_api_key"] or "test-key")
 
-SYSTEM_PROMPT = """You are RiftBuddy, an expert League of Legends duo partner and coach.
-You give concise, actionable macro advice in 1-2 sentences.
-Be encouraging and direct. Never give generic advice; always tie it to the current game state."""
+SYSTEM_PROMPT = """You are RiftBuddy, a League of Legends draft, macro, and live-game coaching staff.
+Act like a human coaching team sitting beside the player: draft analyst, matchup analyst, jungler tracker, lane coach, and shotcaller.
+Every answer must be League-specific, evidence-driven, and immediately usable in-game.
+Use champion names, roles, lane states, cooldown windows, item spikes, objective timers, wave states, vision, jungle pathing, matchup win rates, and comp identity when available.
+Never answer like a generic chatbot. If data is missing, say what is unknown and give the safest League-specific next step.
+Keep advice concise, direct, and game-callout style."""
 
 KOREAN_ONLY_PROMPT = """You are RiftBuddy, an expert League of Legends duo partner and coach.
 Respond in Korean sentences using natural Korean League of Legends server terms.
@@ -33,7 +36,10 @@ def _language_instruction(language: str) -> str:
             "중국어, 일본어, 깨진 문자, 의미 없는 영어 조각은 쓰지 마세요. "
             "짧고 직접적인 콜처럼 1-2문장으로 답하세요."
         )
-    return "Respond in natural English. Keep it short, direct, and game-callout style."
+    return (
+        "Respond in natural English. Keep it short, direct, and game-callout style. "
+        "Use League-specific reasoning only: matchup, wave, vision, jungle path, objective, item spike, cooldown, comp identity, or draft evidence."
+    )
 
 
 def _system_prompt(language: str) -> str:
@@ -154,7 +160,14 @@ def build_user_content(packet: ContextPacket, user_query: Optional[str], languag
     role_line = ""
     if packet.champion_name != "Unknown" and packet.assigned_position != "UNKNOWN":
         role_line = f"Player role: {packet.champion_name} ({packet.assigned_position})\n"
-    user_content = f"{role_line}Current game state:\n{packet.summary}"
+    user_content = (
+        f"{role_line}Current game state:\n{packet.summary}"
+        "\n\nCoaching requirements:"
+        "\n- Use only League-specific reasoning."
+        "\n- Tie the answer to the given game state, draft, matchup, or known unknowns."
+        "\n- Prefer concrete actions over explanation."
+        "\n- Do not give generic motivation or generic gaming advice."
+    )
     if user_query:
         user_content += f"\n\nPlayer asks: {user_query}"
     elif language == "ko":

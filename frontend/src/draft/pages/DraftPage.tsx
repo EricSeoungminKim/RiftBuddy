@@ -1,16 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import ChampionSlot from '../components/ChampionSlot'
 import DraftRecommendPanel from '../components/DraftRecommendPanel'
 import TeamCompPanel from '../components/TeamCompPanel'
 import OpponentMatchupPanel from '../components/OpponentMatchupPanel'
 import { useDraftAnalysis } from '../hooks/useDraftAnalysis'
 import { ChampSelectSlot, useChampSelect } from '../hooks/useChampSelect'
-
-const ROLES = ['탑', '정글', '미드', '바텀', '서폿']
-const ROLE_BY_LCU: Record<string, string> = {
-  top: '탑', jungle: '정글', middle: '미드', bottom: '바텀', utility: '서폿',
-}
+import {
+  championForMatchups,
+  shouldFetchRoleRecommendations,
+  shouldFetchTeamStrategy,
+} from '../automation'
+import { ROLES, Role, findLocalPlayerSlotIndex, resolveSelectedRole, roleLabel } from '../role'
 
 type Team = [string, string, string, string, string]
 const EMPTY_TEAM: Team = ['', '', '', '', '']
@@ -21,25 +21,20 @@ function toTeam(arr: string[]): Team {
   return t
 }
 
-function slotsToTeam(slots: ChampSelectSlot[], fallback: string[]): Team {
-  const t = toTeam(fallback)
+function slotsToTeam(slots: ChampSelectSlot[]): Team {
+  const t = [...EMPTY_TEAM] as Team
   slots.slice(0, 5).forEach((slot, i) => { t[i] = slot.champion || t[i] || '' })
   return t
 }
 
-function roleLabel(slot: ChampSelectSlot | undefined, fallback: string): string {
-  const raw = slot?.assignedPosition?.toLowerCase()
-  return raw ? ROLE_BY_LCU[raw] ?? fallback : fallback
-}
-
 export default function DraftPage() {
-  const navigate = useNavigate()
   const [ally, setAlly] = useState<Team>([...EMPTY_TEAM])
   const [enemy, setEnemy] = useState<Team>([...EMPTY_TEAM])
-  const [myRole, setMyRole] = useState('바텀')
+  const [myRole, setMyRole] = useState<Role>('탑')
+  const [selectedRoleIndex, setSelectedRoleIndex] = useState(0)
   const prevAllyRef = useRef('')
   const prevEnemyRef = useRef('')
-  const prevRoleRef = useRef('')
+  const prevLocalSlotRef = useRef(-1)
   const prevRecommendKeyRef = useRef('')
   const prevStrategyKeyRef = useRef('')
   const prevMatchupKeyRef = useRef('')
@@ -52,7 +47,8 @@ export default function DraftPage() {
 
   const champSelect = useChampSelect(true)
   const roleLabels = ROLES.map((role, i) => roleLabel(champSelect.allySlots[i], role))
-  const mySlotIndex = Math.max(0, champSelect.allySlots.findIndex(slot => slot.cellId === champSelect.myCell))
+  const lcuSlotIndex = findLocalPlayerSlotIndex(champSelect.allySlots, champSelect.myCell)
+  const mySlotIndex = lcuSlotIndex >= 0 ? lcuSlotIndex : selectedRoleIndex
 
   // Sync LCU picks
   useEffect(() => {
@@ -61,58 +57,65 @@ export default function DraftPage() {
     const enemyKey = JSON.stringify(champSelect.enemySlots)
     if (allyKey !== prevAllyRef.current) {
       prevAllyRef.current = allyKey
-      setAlly(prev => slotsToTeam(champSelect.allySlots, prev))
+      setAlly(slotsToTeam(champSelect.allySlots))
     }
     if (enemyKey !== prevEnemyRef.current) {
       prevEnemyRef.current = enemyKey
-      setEnemy(prev => slotsToTeam(champSelect.enemySlots, prev))
+      setEnemy(slotsToTeam(champSelect.enemySlots))
     }
   }, [champSelect])
 
   // Auto-detect my role from LCU
   useEffect(() => {
-    if (!champSelect.inProgress || mySlotIndex < 0) return
-    const detectedRole = roleLabels[mySlotIndex]
-    if (detectedRole && detectedRole !== prevRoleRef.current) {
-      prevRoleRef.current = detectedRole
+    if (!champSelect.inProgress || lcuSlotIndex < 0) return
+    const detectedRole = resolveSelectedRole(roleLabels, lcuSlotIndex, myRole)
+    if (detectedRole !== myRole || lcuSlotIndex !== prevLocalSlotRef.current) {
+      prevLocalSlotRef.current = lcuSlotIndex
+      setSelectedRoleIndex(lcuSlotIndex)
       setMyRole(detectedRole)
     }
-  }, [champSelect.inProgress, mySlotIndex, roleLabels.join('|')])
+  }, [champSelect.inProgress, lcuSlotIndex, myRole, roleLabels.join('|')])
 
   // Auto-fetch recommend when ally/enemy/role changes
   useEffect(() => {
+    if (!shouldFetchRoleRecommendations(champSelect.inProgress)) return
     const allyList = ally.filter(Boolean)
     const key = `${allyList.join(',')}|${enemy.filter(Boolean).join(',')}|${myRole}`
     if (key === prevRecommendKeyRef.current) return
     prevRecommendKeyRef.current = key
     fetchRecommendForRole(allyList, enemy.filter(Boolean), myRole)
-  }, [ally, enemy, myRole, fetchRecommendForRole])
+  }, [ally, enemy, myRole, champSelect.inProgress, fetchRecommendForRole])
 
-  // Auto-fetch team strategy when 2+ ally picks
+  // Auto-fetch team strategy after both teams finish all five picks.
   useEffect(() => {
     const allyList = ally.filter(Boolean)
     const enemyList = enemy.filter(Boolean)
-    if (allyList.length < 2) return
-    const key = `${allyList.join(',')}|${enemyList.join(',')}|${myRole}`
+    const allyCompleted = champSelect.allySlots.slice(0, 5).map(slot => slot.completed)
+    const enemyCompleted = champSelect.enemySlots.slice(0, 5).map(slot => slot.completed)
+    if (!shouldFetchTeamStrategy(ally, enemy, allyCompleted, enemyCompleted)) return
+    const matchupList = Object.values(matchups)
+    const matchupKey = matchupList.map(item => `${item.enemyChampion}:${item.winRate ?? ''}`).join(',')
+    const key = `${allyList.join(',')}|${enemyList.join(',')}|${myRole}|${matchupKey}`
     if (key === prevStrategyKeyRef.current) return
     prevStrategyKeyRef.current = key
     const myChampion = ally[mySlotIndex] || allyList[0] || ''
-    fetchTeamStrategy(allyList, enemyList, myChampion, myRole)
-  }, [ally, enemy, myRole, mySlotIndex, fetchTeamStrategy])
+    fetchTeamStrategy(allyList, enemyList, myChampion, myRole, matchupList)
+  }, [ally, enemy, myRole, mySlotIndex, matchups, champSelect.allySlots, champSelect.enemySlots, fetchTeamStrategy])
 
   // Auto-fetch opponent matchup winrates vs recommended pick
   useEffect(() => {
     const recommendedChamp = recommendForRole?.recommendations?.[0]?.champion
-    if (!recommendedChamp) return
+    const matchupChampion = championForMatchups(ally, mySlotIndex, recommendedChamp ?? '')
+    if (!matchupChampion) return
     const enemyList = enemy.filter(Boolean)
     if (!enemyList.length) return
-    const key = `${recommendedChamp}|${enemyList.join(',')}|${myRole}`
+    const key = `${matchupChampion}|${enemyList.join(',')}|${myRole}`
     if (key === prevMatchupKeyRef.current) return
     prevMatchupKeyRef.current = key
     enemyList.forEach((enemyChamp, i) => {
-      fetchMatchup(recommendedChamp, enemyChamp, myRole, i)
+      fetchMatchup(matchupChampion, enemyChamp, myRole, i)
     })
-  }, [recommendForRole, enemy, myRole, fetchMatchup])
+  }, [recommendForRole, ally, enemy, myRole, mySlotIndex, fetchMatchup])
 
   // Reset on champ select end
   useEffect(() => {
@@ -125,6 +128,7 @@ export default function DraftPage() {
   }, [champSelect.inProgress, reset])
 
   const recommendedChamp = recommendForRole?.recommendations?.[0]?.champion ?? ''
+  const matchupChampion = championForMatchups(ally, mySlotIndex, recommendedChamp)
 
   const pageStyle: React.CSSProperties = {
     display: 'flex',
@@ -143,50 +147,77 @@ export default function DraftPage() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, color: '#f0c040' }}>RiftBuddy — 챔피언 선택</h2>
+          <h2 style={{ margin: 0, fontSize: 18, color: '#f0c040' }}>RiftBuddy Draft</h2>
           <div style={{ fontSize: 11, color: champSelect.inProgress ? '#56f39a' : '#777', marginTop: 3 }}>
             {champSelect.inProgress
-              ? `LCU 연결됨 · 내 역할: ${myRole}`
-              : champSelect.available ? 'League 클라이언트 연결됨 · 챔피언 선택 대기 중'
-              : 'League 클라이언트 실행 대기 중'}
+              ? `LCU connected · role: ${myRole}`
+              : champSelect.available ? 'League client connected · waiting for champion select'
+              : champSelect.reason === 'backend_unreachable'
+                ? `RiftBuddy backend unavailable · ${champSelect.message ?? 'status unknown'}`
+                : 'Waiting for League client'}
           </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {ROLES.map((role, index) => (
+            <button
+              key={role}
+              type="button"
+              onClick={() => {
+                setSelectedRoleIndex(index)
+                setMyRole(role)
+              }}
+              style={{
+                border: `1px solid ${myRole === role ? '#f0c040' : '#2a2d4a'}`,
+                background: myRole === role ? '#f0c040' : '#12131f',
+                color: myRole === role ? '#080a12' : '#aaa',
+                borderRadius: 6,
+                padding: '5px 9px',
+                fontSize: 12,
+                fontWeight: myRole === role ? 700 : 500,
+                cursor: 'pointer',
+              }}
+            >
+              {role}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Pick Grid */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 11, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>아군</div>
+          <div style={{ fontSize: 11, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Ally</div>
           <div style={{ display: 'flex', gap: 6 }}>
             {ally.map((id, i) => (
               <ChampionSlot
                 key={i}
                 championId={id || undefined}
-                role={roleLabels[i]}
+                role={`Slot ${i + 1} · ${roleLabels[i]}`}
                 isAlly={true}
                 size={56}
                 selected={mySlotIndex === i}
                 completed={champSelect.allySlots[i]?.completed ?? true}
-                cellId={champSelect.allySlots[i]?.cellId}
-                onClick={() => {}}
+                onClick={() => {
+                  setSelectedRoleIndex(i)
+                  setMyRole(roleLabels[i])
+                }}
               />
             ))}
           </div>
         </div>
         <div style={{ flex: 1 }} />
         <div>
-          <div style={{ fontSize: 11, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>적군</div>
+          <div style={{ fontSize: 11, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Enemy</div>
           <div style={{ display: 'flex', gap: 6 }}>
             {enemy.map((id, i) => (
               <ChampionSlot
                 key={i}
                 championId={id || undefined}
-                role={roleLabels[i]}
+                role={`Slot ${i + 1}`}
                 isAlly={false}
                 size={56}
                 selected={false}
                 completed={champSelect.enemySlots[i]?.completed ?? true}
-                cellId={champSelect.enemySlots[i]?.cellId}
                 onClick={() => {}}
               />
             ))}
@@ -195,7 +226,7 @@ export default function DraftPage() {
       </div>
 
       {/* Analysis Panels */}
-      <div style={{ display: 'flex', gap: 12, flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, flex: 1, minHeight: 0 }}>
         <DraftRecommendPanel
           recommendations={recommendForRole?.recommendations ?? []}
           meta={recommendForRole?.meta ?? []}
@@ -203,7 +234,7 @@ export default function DraftPage() {
           loading={loadingRecommend}
         />
         <OpponentMatchupPanel
-          recommendedChampion={recommendedChamp}
+          recommendedChampion={matchupChampion}
           enemyChampions={enemy}
           matchups={matchups}
           loading={loadingMatchups}

@@ -6,6 +6,20 @@ from backend.main import app, _game_state_to_ws_payload
 from backend.riot.live_client import GameState
 
 
+def test_backend_allows_vite_renderer_cors():
+    with TestClient(app) as client:
+        response = client.options(
+            "/lcu/champ-select/status",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
 def test_game_state_to_ws_payload_shape():
     state = GameState(
         current_health=1450.0,

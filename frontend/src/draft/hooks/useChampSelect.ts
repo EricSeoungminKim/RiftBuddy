@@ -12,6 +12,7 @@ export interface ChampSelectState {
   inProgress: boolean
   available: boolean
   reason?: string
+  message?: string
 }
 
 export interface ChampSelectSlot {
@@ -67,8 +68,18 @@ export function useChampSelect(enabled: boolean) {
           available: data.available ?? true,
           reason: undefined,
         })
-      } catch {
-        // League client not running — silent
+      } catch (error) {
+        setState({
+          ally: [],
+          enemy: [],
+          allySlots: [],
+          enemySlots: [],
+          myCell: -1,
+          inProgress: false,
+          available: false,
+          reason: 'backend_unreachable',
+          message: error instanceof Error ? error.message : String(error),
+        })
       }
     }
 

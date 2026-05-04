@@ -56,3 +56,20 @@ async def test_cache_expires_after_ttl():
         _cache[key] = (old_ts - CACHE_TTL_SECONDS - 1, old_val)
         await get_champion_analysis("Zed", "MID")
     assert mock_call.call_count == 2
+
+
+def test_parse_champion_analysis_text_payload_extracts_counter_lists():
+    from backend.draft.opgg_client import _parse_champion_analysis_text
+
+    raw = (
+        'LolGetChampionAnalysis(Data(Summary(AverageStats(0.01,0.04,0.48,5,TierData(162,5))),'
+        'Runes("Sorcery",[], "Precision",[],[]),CoreItems([],0),Skills([],0,0),'
+        '[StrongCounter("Ryze",0.52),StrongCounter("Lissandra",0.5)],'
+        '[StrongCounter("LeBlanc",0.57),StrongCounter("Ahri",0.54)],"AP"))'
+    )
+
+    parsed = _parse_champion_analysis_text(raw)
+
+    assert parsed["data"]["summary"]["average_stats"]["win_rate"] == 0.48
+    assert parsed["data"]["strong_counters"][0] == {"champion_name": "Ryze", "win_rate": 0.52}
+    assert parsed["data"]["weak_counters"][1] == {"champion_name": "Ahri", "win_rate": 0.54}

@@ -117,7 +117,10 @@ async def _read_champ_select_state() -> dict:
     port, password = info["port"], info["password"]
 
     async with _make_lcu_client(port, password) as client:
-        resp = await client.get("/lol-champ-select/v1/session")
+        try:
+            resp = await client.get("/lol-champ-select/v1/session")
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=503, detail=f"LCU unavailable: {exc}") from exc
         if resp.status_code == 404:
             raise HTTPException(status_code=404, detail="Not in champion select")
         if resp.status_code != 200:

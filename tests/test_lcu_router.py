@@ -3,6 +3,7 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import httpx
 from httpx import AsyncClient, Response
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
@@ -157,3 +158,23 @@ def test_champ_select_status_returns_quiet_not_in_champ_select(tmp_path):
     assert data["available"] is True
     assert data["inProgress"] is False
     assert data["reason"] == "not_in_champ_select"
+
+
+def test_champ_select_status_returns_quiet_lcu_disconnect(tmp_path):
+    lockfile = _mock_lockfile(tmp_path)
+    patch_paths = {"darwin": lockfile, "win32": lockfile}
+
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(side_effect=httpx.RemoteProtocolError("Server disconnected"))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("backend.lcu.router._LOCKFILE_PATHS", patch_paths), \
+         patch("backend.lcu.router._make_lcu_client", return_value=mock_client):
+        resp = client.get("/lcu/champ-select/status")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["available"] is False
+    assert data["inProgress"] is False
+    assert data["reason"] == "league_client_unavailable"
