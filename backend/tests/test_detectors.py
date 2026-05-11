@@ -1,4 +1,6 @@
 from backend.timeline.schemas import DetectedEvent, Severity
+from backend.knowledge.schemas import KnowledgeSnippet
+from backend.advice.schemas import AdviceRequest
 
 
 def test_detected_event_has_required_fields():
@@ -15,3 +17,37 @@ def test_detected_event_has_required_fields():
 
 def test_severity_ordering():
     assert Severity.HIGH.value > Severity.MEDIUM.value > Severity.LOW.value
+
+
+def test_knowledge_snippet_fields():
+    snippet = KnowledgeSnippet(
+        source="champion:rumble",
+        content="Rumble has no dash — vulnerable when pushed",
+        relevance="high",
+    )
+    assert snippet.source == "champion:rumble"
+    assert snippet.relevance == "high"
+
+
+def test_advice_request_fields():
+    event = DetectedEvent("LOW_HEALTH", Severity.HIGH, "HP 20%", "Recall")
+    snippet = KnowledgeSnippet("champion:rumble", "No dash", "high")
+    req = AdviceRequest(
+        mode="DEFENSIVE",
+        priority_event=event,
+        knowledge_snippets=[snippet],
+        response_length="short",
+    )
+    assert req.mode == "DEFENSIVE"
+    assert req.priority_event.event_type == "LOW_HEALTH"
+    assert len(req.knowledge_snippets) == 1
+
+
+def test_advice_request_no_event():
+    req = AdviceRequest(
+        mode="MACRO",
+        priority_event=None,
+        knowledge_snippets=[],
+        response_length="medium",
+    )
+    assert req.priority_event is None
