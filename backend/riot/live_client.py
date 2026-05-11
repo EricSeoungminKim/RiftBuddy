@@ -36,6 +36,8 @@ class GameState:
     items: tuple[str, ...] = field(default_factory=tuple)
     summoner_spells: tuple[str, ...] = field(default_factory=tuple)
     recent_events: tuple[str, ...] = field(default_factory=tuple)
+    lane_opponent: str | None = None
+    fed_enemy: str | None = None
 
 
 def get_fake_game_state() -> GameState:
@@ -64,6 +66,8 @@ def get_fake_game_state() -> GameState:
         items=("Doran's Shield", "Boots"),
         summoner_spells=("Flash", "Ignite"),
         recent_events=("MinionsSpawning at 0.5m",),
+        lane_opponent="Tryndamere",
+        fed_enemy="Darius",
     )
 
 
@@ -110,6 +114,8 @@ async def fetch_game_state() -> Optional[GameState]:
             items=_extract_item_names(active_player),
             summoner_spells=_extract_summoner_spells(active_player),
             recent_events=_extract_recent_events(data),
+            lane_opponent=_infer_lane_opponent(data, active_player),
+            fed_enemy=_infer_fed_enemy(data, active_player),
         )
     except Exception as exc:
         logger.warning("Riot Live Client API unavailable: %s", exc)
@@ -123,6 +129,33 @@ def _find_active_player(data: dict) -> dict:
         if player.get("riotId") == active_name or player.get("summonerName") == active_summoner:
             return player
     return {}
+
+
+def _infer_lane_opponent(data: dict, active_player: dict) -> str | None:
+    active_team = active_player.get("team")
+    active_position = active_player.get("position", "").upper()
+    if not active_team or not active_position:
+        return None
+    for player in data.get("allPlayers", []):
+        if player.get("team") == active_team:
+            continue
+        if player.get("position", "").upper() == active_position:
+            return player.get("championName")
+    return None
+
+
+def _infer_fed_enemy(data: dict, active_player: dict) -> str | None:
+    active_team = active_player.get("team")
+    best_name: str | None = None
+    best_kills = 0
+    for player in data.get("allPlayers", []):
+        if player.get("team") == active_team:
+            continue
+        kills = player.get("scores", {}).get("kills", 0) or 0
+        if kills > best_kills:
+            best_kills = kills
+            best_name = player.get("championName")
+    return best_name if best_kills > 0 else None
 
 
 def _extract_item_names(player: dict) -> tuple[str, ...]:

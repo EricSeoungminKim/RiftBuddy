@@ -117,3 +117,70 @@ def test_retrieve_with_fed_enemy():
     col = _make_test_collection()
     snippets = retrieve("Zed", "Ahri", "Jinx", col, top_k=3)
     assert len(snippets) == 3
+
+
+from backend.riot.live_client import (
+    GameState, get_fake_game_state,
+    _infer_lane_opponent, _infer_fed_enemy,
+)
+
+
+def test_fake_game_state_has_lane_opponent():
+    state = get_fake_game_state()
+    assert state.lane_opponent is not None
+    assert isinstance(state.lane_opponent, str)
+
+
+def test_fake_game_state_has_fed_enemy():
+    state = get_fake_game_state()
+    assert state.fed_enemy is None or isinstance(state.fed_enemy, str)
+
+
+def test_infer_lane_opponent_top():
+    data = {
+        "allPlayers": [
+            {"championName": "Rumble", "team": "ORDER", "position": "TOP"},
+            {"championName": "Darius", "team": "CHAOS", "position": "TOP"},
+            {"championName": "Jinx", "team": "CHAOS", "position": "BOTTOM"},
+        ]
+    }
+    active_player = {"team": "ORDER", "position": "TOP"}
+    result = _infer_lane_opponent(data, active_player)
+    assert result == "Darius"
+
+
+def test_infer_lane_opponent_no_match():
+    data = {
+        "allPlayers": [
+            {"championName": "Rumble", "team": "ORDER", "position": "TOP"},
+            {"championName": "Jinx", "team": "CHAOS", "position": "BOTTOM"},
+        ]
+    }
+    active_player = {"team": "ORDER", "position": "TOP"}
+    result = _infer_lane_opponent(data, active_player)
+    assert result is None
+
+
+def test_infer_fed_enemy_returns_highest_kills():
+    data = {
+        "allPlayers": [
+            {"championName": "Rumble", "team": "ORDER", "scores": {"kills": 3}},
+            {"championName": "Darius", "team": "CHAOS", "scores": {"kills": 5}},
+            {"championName": "Jinx", "team": "CHAOS", "scores": {"kills": 2}},
+        ]
+    }
+    active_player = {"team": "ORDER"}
+    result = _infer_fed_enemy(data, active_player)
+    assert result == "Darius"
+
+
+def test_infer_fed_enemy_all_zero_returns_none():
+    data = {
+        "allPlayers": [
+            {"championName": "Rumble", "team": "ORDER", "scores": {"kills": 0}},
+            {"championName": "Darius", "team": "CHAOS", "scores": {"kills": 0}},
+        ]
+    }
+    active_player = {"team": "ORDER"}
+    result = _infer_fed_enemy(data, active_player)
+    assert result is None
