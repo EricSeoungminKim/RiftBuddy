@@ -12,7 +12,17 @@ from backend.lcu.router import router as lcu_router
 from backend.postgame.router import router as postgame_router
 from backend.postgame.router import game_session as _game_session
 from backend.config import CONFIG
-from backend.context.engine import build_context_packet
+from backend.context.engine import build_context_packet, enrich_summary_with_events
+from backend.timeline.event_detector import EventDetectorPipeline
+from backend.timeline.detectors.low_health import LowHealthDetector
+from backend.timeline.detectors.gold_spike import GoldSpikeDetector
+from backend.timeline.detectors.objective_timer import ObjectiveTimerDetector
+from backend.timeline.detectors.death_streak import DeathStreakDetector
+from backend.timeline.detectors.recall_window import RecallWindowDetector
+from backend.timeline.detectors.item_completion import ItemCompletionDetector
+from backend.timeline.detectors.cs_drop import CSDropDetector
+from backend.timeline.detectors.vision_warning import VisionWarningDetector
+from backend.timeline.detectors.enemy_jungle_unknown import EnemyJungleUnknownDetector
 from backend.context.question_planner import build_planned_question
 from backend.llm.advisor import get_advice
 from backend.riot.live_client import fetch_game_state, GameState
@@ -22,6 +32,17 @@ from backend.voice.wake_word import capture_voice_question_once, run_wake_word_l
 
 logger = logging.getLogger(__name__)
 active_websockets: set[WebSocket] = set()
+_event_pipeline = EventDetectorPipeline(detectors=[
+    LowHealthDetector(),
+    GoldSpikeDetector(),
+    ObjectiveTimerDetector(),
+    DeathStreakDetector(),
+    RecallWindowDetector(),
+    ItemCompletionDetector(),
+    CSDropDetector(),
+    VisionWarningDetector(),
+    EnemyJungleUnknownDetector(),
+])
 wake_word_task: asyncio.Task | None = None
 _game_poll_task: asyncio.Task | None = None
 
@@ -201,6 +222,8 @@ async def send_advice(websocket: WebSocket, user_query: str | None, language: st
         await websocket.send_json({"type": "transcript", "text": user_query})
 
     packet = build_context_packet(game_state)
+    detected_events = _event_pipeline.run(game_state, packet)
+    packet = enrich_summary_with_events(packet, detected_events)
     advice = await get_advice(packet, user_query=user_query, language=language)
     audio_bytes = None
     audio_error = None

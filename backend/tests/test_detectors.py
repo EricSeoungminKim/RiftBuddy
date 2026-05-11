@@ -3,7 +3,7 @@ from backend.knowledge.schemas import KnowledgeSnippet
 from backend.advice.schemas import AdviceRequest
 from backend.timeline.event_detector import BaseDetector, EventDetectorPipeline
 from backend.riot.live_client import GameState
-from backend.context.engine import build_context_packet
+from backend.context.engine import build_context_packet, enrich_summary_with_events
 from backend.timeline.detectors.low_health import LowHealthDetector
 from backend.timeline.detectors.gold_spike import GoldSpikeDetector
 from backend.timeline.detectors.objective_timer import ObjectiveTimerDetector
@@ -231,3 +231,23 @@ def test_objective_no_alert_after_voidgrubs_killed():
     packet = build_context_packet(state)
     events = [e for e in detector.detect(state, packet) if "Voidgrub" in e.reason]
     assert events == []
+
+
+def test_enrich_summary_adds_events():
+    state = _make_state(current_health=500, max_health=2000, gold=2600)
+    packet = build_context_packet(state)
+    events = [
+        DetectedEvent("LOW_HEALTH", Severity.HIGH, "HP 25%", "귀환"),
+        DetectedEvent("GOLD_SPIKE", Severity.HIGH, "2600골드", "아이템 구매"),
+    ]
+    enriched = enrich_summary_with_events(packet, events)
+    assert "[DETECTED EVENTS]" in enriched.summary
+    assert "LOW_HEALTH" in enriched.summary
+    assert "GOLD_SPIKE" in enriched.summary
+
+
+def test_enrich_summary_unchanged_with_no_events():
+    state = _make_state()
+    packet = build_context_packet(state)
+    enriched = enrich_summary_with_events(packet, [])
+    assert enriched.summary == packet.summary

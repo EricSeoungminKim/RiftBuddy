@@ -74,3 +74,25 @@ def _format_list(values: tuple[str, ...]) -> str:
 
 def normalize_position(position: str) -> str:
     return POSITION_LABELS.get(position.upper(), position)
+
+
+from backend.timeline.schemas import DetectedEvent
+
+
+def enrich_summary_with_events(packet: ContextPacket, events: list[DetectedEvent]) -> ContextPacket:
+    if not events:
+        return packet
+    lines = ["[DETECTED EVENTS]"]
+    for event in events:
+        lines.append(f"- {event.event_type} ({event.severity.name}): {event.reason} → {event.recommended_action}")
+    event_block = "\n".join(lines)
+    return ContextPacket(
+        health_percent=packet.health_percent,
+        gold=packet.gold,
+        level=packet.level,
+        game_time_minutes=packet.game_time_minutes,
+        summary=f"{event_block}\n\n{packet.summary}",
+        champion_name=packet.champion_name,
+        assigned_position=packet.assigned_position,
+        creep_score=packet.creep_score,
+    )
