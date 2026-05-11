@@ -43,3 +43,8 @@ def test_loader_rumble_present():
     snippets = load_champion_snippets(DATA_DIR)
     sources = [s.source for s in snippets]
     assert any("rumble" in src for src in sources)
+
+
+def test_loader_empty_dir_returns_empty(tmp_path):
+    snippets = load_champion_snippets(tmp_path)
+    assert snippets == []
