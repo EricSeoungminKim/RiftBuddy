@@ -6,6 +6,7 @@ import pytest
 
 from backend.knowledge.embedder import build_collection, get_or_build_collection
 from backend.knowledge.loader import load_champion_snippets
+from backend.knowledge.retriever import retrieve
 from backend.knowledge.schemas import KnowledgeSnippet
 
 DATA_DIR = Path("backend/knowledge/data")
@@ -77,9 +78,6 @@ def test_get_or_build_reuses_existing():
         col1 = get_or_build_collection(DATA_DIR, db_path)
         col2 = get_or_build_collection(DATA_DIR, db_path)
         assert col1.count() == col2.count()
-
-
-from backend.knowledge.retriever import retrieve
 
 
 def _make_test_collection():
