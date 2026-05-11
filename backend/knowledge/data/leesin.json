@@ -1,0 +1,37 @@
+{
+  "champion": "leesin",
+  "gameplan": {
+    "summary": "Dominate early game with Q gank threat. Snowball kills before falling off at 3 items.",
+    "power_spikes": ["level 3 (Q+E+W combo)", "Serpent's Fang", "early first back powerspike"],
+    "win_condition": "Gank lanes early, get ahead, and use Insec kick in teamfights to displace carries.",
+    "early_game": "Q → Q2 for execute. W to sustain. E to slow and shred armor. Invade enemy jungle at level 2.",
+    "positioning": "Stay mobile. Insec kick: Q target, ward jump behind, R to kick into team."
+  },
+  "matchups": {
+    "hecarim": {
+      "difficulty": "medium",
+      "tips": "He outduels you at level 6. Invade early before he scales. Take Ignite for duels.",
+      "power_shift": "He outscales in sustained fights. Win through early ganks and objective control."
+    },
+    "vi": {
+      "difficulty": "medium",
+      "tips": "She has point-and-click CC. Don't fight her in her jungle at level 6. Invade at level 2.",
+      "power_shift": "Even early. She scales better. Win through early snowball before 20 minutes."
+    },
+    "graves": {
+      "difficulty": "hard",
+      "tips": "He outduels you at all stages post level 3. Avoid 1v1s. Win through ganking while he farms.",
+      "power_shift": "He wins all 1v1s. Win through superior ganks and objective setup."
+    },
+    "amumu": {
+      "difficulty": "easy",
+      "tips": "Invade him freely — he has no early dueling. Steal his camps. Counter-gank his ganks.",
+      "power_shift": "You win early; he wins teamfights at 6. Shut him down before he gets ult."
+    },
+    "kindred": {
+      "difficulty": "medium",
+      "tips": "Contest her marks to deny stacks. Invade before she gets 4 marks. Don't fight inside her ult.",
+      "power_shift": "She outscales at 4+ marks. Win before she reaches scaling threshold."
+    }
+  }
+}

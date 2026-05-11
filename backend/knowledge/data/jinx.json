@@ -1,0 +1,37 @@
+{
+  "champion": "jinx",
+  "gameplan": {
+    "summary": "Scale safely to 3 items then hypercarry teamfights with Fishbones AoE. Never get caught alone.",
+    "power_spikes": ["level 6 (Super Mega Death Rocket)", "Kraken Slayer + Runaan's", "full build"],
+    "win_condition": "Stay safe in teamfights behind your frontline. Let Fishbones shred grouped enemies.",
+    "early_game": "Farm safely with Minigun. Only poke with Fishbones when mana allows. Play for 3 items.",
+    "positioning": "Extreme backline. Never walk up without peel. Use E traps to create distance from divers."
+  },
+  "matchups": {
+    "caitlyn": {
+      "difficulty": "hard",
+      "tips": "She outranges you early. Farm under tower. Buy Vampiric Scepter to sustain her poke.",
+      "power_shift": "You outscale at 3 items. Survive laning phase and win late teamfights."
+    },
+    "draven": {
+      "difficulty": "hard",
+      "tips": "He wins all early trades. Play for farm only. Don't fight without support CC to set up.",
+      "power_shift": "Equal at 2 items. You win if game goes long — his lead fades without kills."
+    },
+    "jhin": {
+      "difficulty": "medium",
+      "tips": "Dodge his W root — it enables his full combo. Farm and scale. Buy early Vampiric Scepter.",
+      "power_shift": "You outscale in teamfights. His damage spikes before yours."
+    },
+    "ezreal": {
+      "difficulty": "easy",
+      "tips": "He pokes you but won't all-in. Farm freely. He can't engage without Arcane Shift.",
+      "power_shift": "You win sustained teamfights at 3 items. He falls off unless snowballed."
+    },
+    "zeri": {
+      "difficulty": "medium",
+      "tips": "She kites better than you. Play around your support CC. Don't chase her.",
+      "power_shift": "Even at 3 items. Win through superior AoE in 5v5 teamfights."
+    }
+  }
+}

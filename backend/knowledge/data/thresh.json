@@ -1,0 +1,37 @@
+{
+  "champion": "thresh",
+  "gameplan": {
+    "summary": "Control lane with hook threats, stack souls for scaling, and carry with Lantern + Death Sentence combos.",
+    "power_spikes": ["level 2 (Q+E combo)", "40 souls", "Locket + Knight's Vow"],
+    "win_condition": "Create picks with Death Sentence then snowball. Peel for ADC in teamfights with Flay.",
+    "early_game": "Level 1 Q hook onto overextended targets. Level 2 all-in with E slow. Always collect souls.",
+    "positioning": "Roam constantly. Drop Lantern for teammates in danger. Save W for clutch plays."
+  },
+  "matchups": {
+    "blitzcrank": {
+      "difficulty": "medium",
+      "tips": "Both want to hook first. Stand behind minions. If he hooks your ADC, E-slow him immediately.",
+      "power_shift": "You outscale him in soul stacking. Win long games with superior kit utility."
+    },
+    "nautilus": {
+      "difficulty": "medium",
+      "tips": "His Q root is hard CC — don't stand near walls. Poke him before he engages.",
+      "power_shift": "Both are engage supports. Win by landing Death Sentence before his Q."
+    },
+    "lulu": {
+      "difficulty": "hard",
+      "tips": "Her W polymorph stops your hook combo. Time Q when she wastes W on a minion.",
+      "power_shift": "She outpokes you early. Win through roaming when she stays bot lane."
+    },
+    "soraka": {
+      "difficulty": "easy",
+      "tips": "Hook her freely — she has no mobility. Zone her from ADC so she can't heal. Ignite to counter Wish.",
+      "power_shift": "You win all-ins with hook combos. She scales better if game goes past 30 min."
+    },
+    "leona": {
+      "difficulty": "medium",
+      "tips": "She has stronger burst CC at level 2. Play passive pre-6. Use Lantern to disengage her engage.",
+      "power_shift": "Even. Both are engage supports. Win through superior roaming and picks."
+    }
+  }
+}

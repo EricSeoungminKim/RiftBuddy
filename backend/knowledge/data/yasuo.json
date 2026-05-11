@@ -1,0 +1,37 @@
+{
+  "champion": "yasuo",
+  "gameplan": {
+    "summary": "Scale into an unstoppable carry with knockup combos and unlimited Windwall. Win through mobility.",
+    "power_spikes": ["level 3 (Q tornado)", "Immortal Shieldbow + Infinity Edge", "full build"],
+    "win_condition": "Set up Last Breath combos with allied knockups. Dash through minions to avoid skillshots.",
+    "early_game": "Q stack tornado poke. E through minions aggressively. Shield absorbs one hit — trade into it.",
+    "positioning": "Dash to backline in teamfights. Never stand still — constant E dashing makes you impossible to hit."
+  },
+  "matchups": {
+    "malphite": {
+      "difficulty": "hard",
+      "tips": "He hard-counters you — armor passive, point-and-click ult. Rush Wit's End for MR and on-hit. Farm and roam.",
+      "power_shift": "He wins 1v1 all game. Win by roaming to other lanes and avoiding him entirely."
+    },
+    "pantheon": {
+      "difficulty": "hard",
+      "tips": "His E blocks your Q. Never dash to him — he blocks it. Poke with tornado at max range only.",
+      "power_shift": "He wins early hard. You outscale at 3 items if you survived laning phase."
+    },
+    "annie": {
+      "difficulty": "medium",
+      "tips": "Windwall her Q and W. Always track her stun count — if she has 4 stacks, disengage immediately.",
+      "power_shift": "You outscale at 2 items. Win by Windwalling her burst and outlasting her damage."
+    },
+    "zed": {
+      "difficulty": "medium",
+      "tips": "Windwall his Q poke. Time W shadow to avoid his ult. Buy Verdant Barrier early.",
+      "power_shift": "He wins early; you win at 2 items with shield. Equal matchup with Shieldbow rush."
+    },
+    "akali": {
+      "difficulty": "medium",
+      "tips": "Never dash into her shroud — she all-ins you there. Poke with tornado. Save E dash for escape not engage.",
+      "power_shift": "Even. She outbursts; you outscale in sustained fights. Win via teamfight mobility."
+    }
+  }
+}

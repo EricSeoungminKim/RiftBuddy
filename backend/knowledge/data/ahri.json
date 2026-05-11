@@ -1,0 +1,37 @@
+{
+  "champion": "ahri",
+  "gameplan": {
+    "summary": "Roam after shoving waves and pick off isolated targets with charm. Scale into mobile assassin.",
+    "power_spikes": ["level 6 (Spirit Rush roam)", "Luden's Tempest", "full build"],
+    "win_condition": "Charm into full combo for picks. Never fight fair — use Spirit Rush to outmaneuver.",
+    "early_game": "Q for waveclear and poke. E charm is your kill threat. Never use E defensively — save it for kills.",
+    "positioning": "Flank from side in teamfights. Spirit Rush in, charm, combo, Spirit Rush out."
+  },
+  "matchups": {
+    "leblanc": {
+      "difficulty": "hard",
+      "tips": "She bursts faster than you. Buy early MR (Verdant Barrier). Dodge her Q mark with dash. Never let her chain CC.",
+      "power_shift": "Even at 2 items. Win through superior roaming — she's a solo lane bully, you're a roamer."
+    },
+    "zed": {
+      "difficulty": "medium",
+      "tips": "Charm him while he's in shadow form to stop combo. Buy Zhonya's — it counters his ult entirely.",
+      "power_shift": "He wins without Zhonya's; you win with it. Build Zhonya's second item."
+    },
+    "yasuo": {
+      "difficulty": "medium",
+      "tips": "His Windwall blocks your Q and orb. Bait Windwall then engage with E charm. Play around his no-shield HP.",
+      "power_shift": "He outduels at 2 items. Win through superior roaming and picking off squishy targets."
+    },
+    "viktor": {
+      "difficulty": "medium",
+      "tips": "Stay mobile to dodge his E gravity field — getting caught in it means full combo death. Roam frequently.",
+      "power_shift": "He outscales in AoE teamfights. Win through picking off targets before 5v5s happen."
+    },
+    "syndra": {
+      "difficulty": "hard",
+      "tips": "She one-shots at level 9 with 7 orbs. Buy early MR. Dodge her E stun — it enables full combo.",
+      "power_shift": "She outranges and outbursts you. Win by roaming constantly rather than fighting her."
+    }
+  }
+}

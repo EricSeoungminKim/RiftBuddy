@@ -54,3 +54,6 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
+# ChromaDB local vector store
+.chroma_db/

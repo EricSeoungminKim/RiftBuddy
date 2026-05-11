@@ -1,0 +1,37 @@
+{
+  "champion": "zed",
+  "gameplan": {
+    "summary": "Assassinate squishy carries with W+R combo. Snowball kills before enemy builds armor.",
+    "power_spikes": ["level 6 (Death Mark)", "Youmuu's + Serpent's Fang", "3 lethality items"],
+    "win_condition": "One-shot the enemy ADC or APC in every teamfight. Use shadows for mobility escapes.",
+    "early_game": "Q poke safely. Level 6 first kill window. Never waste W — it's your only escape.",
+    "positioning": "Flank from fog of war. W behind enemy carries. Ult onto isolated target, never into frontline."
+  },
+  "matchups": {
+    "ahri": {
+      "difficulty": "medium",
+      "tips": "She charms you during ult — walk unpredictably. She will buy Zhonya's; plan around it.",
+      "power_shift": "You win if she's behind. Even matchup with Zhonya's in play."
+    },
+    "lissandra": {
+      "difficulty": "hard",
+      "tips": "Her ult counters your Death Mark entirely — she ults herself to negate it. Delay ult until her ult is down.",
+      "power_shift": "She hard-counters you. Win through roaming to other lanes rather than fighting her."
+    },
+    "malzahar": {
+      "difficulty": "hard",
+      "tips": "His E silence stops your combo. His ult suppresses you — build QSS. Avoid extended fights.",
+      "power_shift": "He counters your kit. Win by roaming aggressively and avoiding him."
+    },
+    "orianna": {
+      "difficulty": "medium",
+      "tips": "Dodge her Q-W poke. Shadow jump her and kill before she can get ball protection from teammates.",
+      "power_shift": "You win 1v1 early. She wins teamfights at 3 items. Kill her before 20 minutes."
+    },
+    "katarina": {
+      "difficulty": "medium",
+      "tips": "Both are all-in assassins — fight for level 6 first kill. Don't let her reset daggers.",
+      "power_shift": "She outscales in teamfights with resets. Win through solo kills before she gets 2 items."
+    }
+  }
+}

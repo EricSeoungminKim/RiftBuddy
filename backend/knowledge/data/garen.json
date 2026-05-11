@@ -1,0 +1,37 @@
+{
+  "champion": "garen",
+  "gameplan": {
+    "summary": "Bully early with Q-auto-W, scale into a frontline tank. Win through sustained fights and Villain execution.",
+    "power_spikes": ["level 1-3 (Q bully)", "Stridebreaker", "full tank build"],
+    "win_condition": "Split push and force 1v1s early. Teamfight as frontline tank with Judgment peel.",
+    "early_game": "Q into auto with Decisive Strike. Max Q for max slow and silence duration.",
+    "positioning": "Frontline in teamfights. Use W to reduce damage. Save Q for catching key targets."
+  },
+  "matchups": {
+    "darius": {
+      "difficulty": "hard",
+      "tips": "Never let him stack bleed to 5. Short trades only — Q in and out. Buy Steelcaps + Stridebreaker rush.",
+      "power_shift": "He wins extended trades all game. Win through split pushing when he's not nearby."
+    },
+    "teemo": {
+      "difficulty": "hard",
+      "tips": "His blind negates your Q auto. Rush MR item. Don't chase into his mushrooms. Freeze lane.",
+      "power_shift": "He kites you forever. Win by roaming and taking objectives while he pushes."
+    },
+    "malphite": {
+      "difficulty": "medium",
+      "tips": "Long trade wins — Judgment melts him. Don't let him poke you down pre-6. Take Ignite.",
+      "power_shift": "Even. Both are frontlines. Win via Stridebreaker to prevent him kiting."
+    },
+    "vayne": {
+      "difficulty": "hard",
+      "tips": "She shreds tanks with W passive. Pressure early before she scales. Force fights before 3 items.",
+      "power_shift": "She wins 1v1 at 2+ items. Win through teamfights where her DPS is split."
+    },
+    "nasus": {
+      "difficulty": "medium",
+      "tips": "Deny his farm early with Q poke. Don't let him reach 300 stacks. Pressure him off minions constantly.",
+      "power_shift": "He outscales at 400+ stacks. Win the game before 25 minutes."
+    }
+  }
+}

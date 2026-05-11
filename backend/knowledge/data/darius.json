@@ -1,0 +1,37 @@
+{
+  "champion": "darius",
+  "gameplan": {
+    "summary": "Win lane through bleed stacks and all-ins. Snowball kills into Noxian Might for free kills.",
+    "power_spikes": ["level 3 (full combo)", "Stridebreaker", "Noxian Might active (5 stacks)"],
+    "win_condition": "Stack bleed to 5 and execute with Noxus Guillotine. Dominate side lane.",
+    "early_game": "Level 1 E to pull then Q heal. Level 3 is first kill window. Max Q.",
+    "positioning": "Flank at choke points. Use E to pull isolated targets. Never fight without Tenacity vs CC."
+  },
+  "matchups": {
+    "garen": {
+      "difficulty": "medium",
+      "tips": "He silences you — don't use E while silenced. Bait his W then commit. Win long trades.",
+      "power_shift": "You win extended trades with bleed. Short trades favor Garen. Force long fights."
+    },
+    "fiora": {
+      "difficulty": "hard",
+      "tips": "She parries your E pull — never use E as opener. Bait parry with auto, then Q+E combo.",
+      "power_shift": "She outduels you at 2+ items. Win via roaming and taking objectives."
+    },
+    "quinn": {
+      "difficulty": "hard",
+      "tips": "Her E knock-back cancels your pull. Rush Merc Treads. Freeze lane and roam.",
+      "power_shift": "She kites you all game. Win through splitpush when she's elsewhere."
+    },
+    "malphite": {
+      "difficulty": "easy",
+      "tips": "You shred his armor with passive. Free all-in at level 3. Ignite + full combo wins early.",
+      "power_shift": "You win all stages of the game 1v1. Avoid his teamfight ult setup."
+    },
+    "rumble": {
+      "difficulty": "medium",
+      "tips": "Respect his Q poke at range. All-in when he's overheated. Use E pull to gap-close through his E slow.",
+      "power_shift": "You win level 1-5. He outscales in teamfights. Win before he gets 2 items."
+    }
+  }
+}

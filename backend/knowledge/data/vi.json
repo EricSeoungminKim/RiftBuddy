@@ -1,0 +1,37 @@
+{
+  "champion": "vi",
+  "gameplan": {
+    "summary": "Gank with point-and-click ult lockdown and snowball carries. Transition into frontline bruiser.",
+    "power_spikes": ["level 6 (Assault and Battery)", "Trinity Force", "full bruiser build"],
+    "win_condition": "Ult the enemy carry in every teamfight. Use W armor shred to enable your team.",
+    "early_game": "Q gap-close for early ganks level 3. E W passive gives strong dueling. Farm to 6 fast.",
+    "positioning": "Initiate with ult on carry. Peel with Q for your own carries after initial engage."
+  },
+  "matchups": {
+    "leesin": {
+      "difficulty": "medium",
+      "tips": "He outduels you before level 6. Avoid early invade. After 6 your ult wins all duels.",
+      "power_shift": "You win post-6 duels. He wins early jungle. Get ahead through ganking not dueling."
+    },
+    "hecarim": {
+      "difficulty": "hard",
+      "tips": "He outduels you and out-ganks you pre-6. Avoid early fights. Counter-gank his ganks.",
+      "power_shift": "He scales better. Win by targeting lanes he ignores and taking objectives."
+    },
+    "warwick": {
+      "difficulty": "medium",
+      "tips": "His ult suppresses you — don't duel near low-HP allies. Invade at level 2 before he heals up.",
+      "power_shift": "Even. He sustains better; you engage better. Win through ganking over dueling."
+    },
+    "diana": {
+      "difficulty": "medium",
+      "tips": "She outduels you post-6 in extended fights. Gank faster and earlier before she stabilizes.",
+      "power_shift": "You win through pick potential on carries. She wins 1v1 sustained fights."
+    },
+    "graves": {
+      "difficulty": "hard",
+      "tips": "He wins all duels at all stages. Never fight him 1v1 in his jungle. Win through superior ganks.",
+      "power_shift": "He wins duels; you win teamfights. Avoid him and target laners."
+    }
+  }
+}

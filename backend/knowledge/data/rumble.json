@@ -1,0 +1,37 @@
+{
+  "champion": "rumble",
+  "gameplan": {
+    "summary": "Farm to 3 core items then become a teamfight monster. Avoid extended 1v1s vs tanks late.",
+    "power_spikes": ["level 6 (Equalizer)", "Sunfire + Rylai's", "full build"],
+    "win_condition": "Hit 5-man Equalizer in teamfights. Never split push.",
+    "early_game": "Harass with E+Q. Don't overheat past 50% heat in trades. Trade short bursts.",
+    "positioning": "Flank from fog of war for Equalizer. Never front-line into hard engage."
+  },
+  "matchups": {
+    "darius": {
+      "difficulty": "hard",
+      "tips": "Never fight extended. Poke with Q from max range. Disengage immediately if he grabs you. Buy Ninja Tabi early.",
+      "power_shift": "You outscale at 2 items. Survive laning phase and win through teamfights."
+    },
+    "garen": {
+      "difficulty": "medium",
+      "tips": "Poke freely with Q early. Respect his all-in at level 6. Kite backwards with E+Q combo.",
+      "power_shift": "Even scaling. Win through teamfight Equalizer, not dueling."
+    },
+    "tryndamere": {
+      "difficulty": "hard",
+      "tips": "Poke with Q but never commit to a full trade — he wins extended. Keep ignite for his ult. Buy Thornmail.",
+      "power_shift": "You win teamfights; he wins side lane. Force 5v5s."
+    },
+    "fiora": {
+      "difficulty": "hard",
+      "tips": "She parries your Q — bait the parry with E first, then Q. Never fight without heat advantage. Take Ghost.",
+      "power_shift": "She outduels you all game. Win through teamfights, never 1v1 post-6."
+    },
+    "malphite": {
+      "difficulty": "easy",
+      "tips": "Freely poke with Q. He has no way to close the gap early. Stack heat slowly for consistent damage.",
+      "power_shift": "Both want teamfights. You win if Equalizer hits; he wins if ult engages first."
+    }
+  }
+}
