@@ -1,5 +1,10 @@
+import tempfile
 from pathlib import Path
+
+import chromadb
 import pytest
+
+from backend.knowledge.embedder import build_collection, get_or_build_collection
 from backend.knowledge.loader import load_champion_snippets
 from backend.knowledge.schemas import KnowledgeSnippet
 
@@ -48,11 +53,6 @@ def test_loader_rumble_present():
 def test_loader_empty_dir_returns_empty(tmp_path):
     snippets = load_champion_snippets(tmp_path)
     assert snippets == []
-
-
-import tempfile
-from backend.knowledge.embedder import build_collection, get_or_build_collection
-import chromadb
 
 
 def test_build_collection_returns_collection():
