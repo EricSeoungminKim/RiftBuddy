@@ -6,6 +6,7 @@ from backend.riot.live_client import GameState
 from backend.context.engine import build_context_packet
 from backend.timeline.detectors.low_health import LowHealthDetector
 from backend.timeline.detectors.gold_spike import GoldSpikeDetector
+from backend.timeline.detectors.objective_timer import ObjectiveTimerDetector
 
 
 def test_detected_event_has_required_fields():
@@ -159,3 +160,74 @@ def test_gold_spike_fires_at_exactly_1300():
     packet = build_context_packet(state)
     events = detector.detect(state, packet)
     assert len(events) == 1
+
+
+def test_objective_fires_60s_before_first_dragon():
+    # game_time = 4:10 (250s) — 50s before Dragon first spawn at 5:00 (300s)
+    detector = ObjectiveTimerDetector()
+    state = _make_state(game_time=250.0)
+    packet = build_context_packet(state)
+    events = detector.detect(state, packet)
+    event_types = [e.event_type for e in events]
+    assert "OBJECTIVE_SPAWN" in event_types
+    matching = [e for e in events if e.event_type == "OBJECTIVE_SPAWN"]
+    assert any("Dragon" in e.reason for e in matching)
+
+
+def test_objective_silent_before_60s_window():
+    # game_time = 3:00 (180s) — 2 min before Dragon
+    detector = ObjectiveTimerDetector()
+    state = _make_state(game_time=180.0)
+    packet = build_context_packet(state)
+    events = detector.detect(state, packet)
+    assert events == []
+
+
+def test_objective_fires_60s_before_first_baron():
+    # game_time = 19:10 (1150s) — 50s before Baron first spawn at 20:00 (1200s)
+    detector = ObjectiveTimerDetector()
+    state = _make_state(game_time=1150.0)
+    packet = build_context_packet(state)
+    events = detector.detect(state, packet)
+    event_types = [e.event_type for e in events]
+    assert "OBJECTIVE_SPAWN" in event_types
+    matching = [e for e in events if e.event_type == "OBJECTIVE_SPAWN"]
+    assert any("Baron" in e.reason for e in matching)
+
+
+def test_objective_dragon_respawn_after_kill():
+    # DragonKill at 5.0m (300s) → respawn at 10:00 (600s)
+    # game_time = 9:10 (550s) — 50s before respawn
+    detector = ObjectiveTimerDetector()
+    state = _make_state(
+        game_time=550.0,
+        recent_events=("DragonKill at 5.0m",),
+    )
+    packet = build_context_packet(state)
+    events = detector.detect(state, packet)
+    event_types = [e.event_type for e in events]
+    assert "OBJECTIVE_SPAWN" in event_types
+
+
+def test_objective_voidgrubs_despawn_warning():
+    # game_time = 14:10 (850s) — Voidgrubs despawn at 14:45 (885s), within 60s
+    detector = ObjectiveTimerDetector()
+    state = _make_state(game_time=850.0, recent_events=())
+    packet = build_context_packet(state)
+    events = detector.detect(state, packet)
+    event_types = [e.event_type for e in events]
+    assert "OBJECTIVE_SPAWN" in event_types
+    matching = [e for e in events if e.event_type == "OBJECTIVE_SPAWN"]
+    assert any("Voidgrub" in e.reason for e in matching)
+
+
+def test_objective_no_alert_after_voidgrubs_killed():
+    # Voidgrubs already killed — no alert
+    detector = ObjectiveTimerDetector()
+    state = _make_state(
+        game_time=850.0,
+        recent_events=("VoidgrubKill at 9.0m",),
+    )
+    packet = build_context_packet(state)
+    events = [e for e in detector.detect(state, packet) if "Voidgrub" in e.reason]
+    assert events == []
