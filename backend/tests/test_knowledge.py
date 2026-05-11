@@ -48,3 +48,32 @@ def test_loader_rumble_present():
 def test_loader_empty_dir_returns_empty(tmp_path):
     snippets = load_champion_snippets(tmp_path)
     assert snippets == []
+
+
+import tempfile
+from backend.knowledge.embedder import build_collection, get_or_build_collection
+import chromadb
+
+
+def test_build_collection_returns_collection():
+    snippets = load_champion_snippets(DATA_DIR)
+    with tempfile.TemporaryDirectory() as tmp:
+        collection = build_collection(snippets, Path(tmp))
+        assert collection is not None
+
+
+def test_build_collection_document_count():
+    snippets = load_champion_snippets(DATA_DIR)
+    with tempfile.TemporaryDirectory() as tmp:
+        collection = build_collection(snippets, Path(tmp))
+        count = collection.count()
+        assert count == len(snippets)
+
+
+def test_get_or_build_reuses_existing():
+    snippets = load_champion_snippets(DATA_DIR)
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = Path(tmp)
+        col1 = get_or_build_collection(DATA_DIR, db_path)
+        col2 = get_or_build_collection(DATA_DIR, db_path)
+        assert col1.count() == col2.count()
