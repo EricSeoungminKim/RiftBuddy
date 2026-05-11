@@ -4,6 +4,7 @@ from backend.advice.schemas import AdviceRequest
 from backend.timeline.event_detector import BaseDetector, EventDetectorPipeline
 from backend.riot.live_client import GameState
 from backend.context.engine import build_context_packet
+from backend.timeline.detectors.low_health import LowHealthDetector
 
 
 def test_detected_event_has_required_fields():
@@ -95,3 +96,29 @@ def test_pipeline_sorts_by_severity_descending():
     events = pipeline.run(state, packet)
     assert events[0].severity == Severity.HIGH
     assert events[1].severity == Severity.LOW
+
+
+def test_low_health_detector_fires_below_30_percent():
+    detector = LowHealthDetector()
+    state = _make_state(current_health=500, max_health=2000)  # 25%
+    packet = build_context_packet(state)
+    events = detector.detect(state, packet)
+    assert len(events) == 1
+    assert events[0].event_type == "LOW_HEALTH"
+    assert events[0].severity == Severity.HIGH
+
+
+def test_low_health_detector_silent_above_30_percent():
+    detector = LowHealthDetector()
+    state = _make_state(current_health=700, max_health=2000)  # 35%
+    packet = build_context_packet(state)
+    events = detector.detect(state, packet)
+    assert events == []
+
+
+def test_low_health_detector_fires_at_exactly_29_percent():
+    detector = LowHealthDetector()
+    state = _make_state(current_health=580, max_health=2000)  # 29%
+    packet = build_context_packet(state)
+    events = detector.detect(state, packet)
+    assert len(events) == 1
