@@ -5,6 +5,7 @@ from backend.timeline.event_detector import BaseDetector, EventDetectorPipeline
 from backend.riot.live_client import GameState
 from backend.context.engine import build_context_packet
 from backend.timeline.detectors.low_health import LowHealthDetector
+from backend.timeline.detectors.gold_spike import GoldSpikeDetector
 
 
 def test_detected_event_has_required_fields():
@@ -119,6 +120,42 @@ def test_low_health_detector_silent_above_30_percent():
 def test_low_health_detector_fires_at_exactly_29_percent():
     detector = LowHealthDetector()
     state = _make_state(current_health=580, max_health=2000)  # 29%
+    packet = build_context_packet(state)
+    events = detector.detect(state, packet)
+    assert len(events) == 1
+
+
+def test_gold_spike_high_severity_above_2500():
+    detector = GoldSpikeDetector()
+    state = _make_state(current_health=1500, max_health=2000, gold=2600)
+    packet = build_context_packet(state)
+    events = detector.detect(state, packet)
+    assert len(events) == 1
+    assert events[0].event_type == "GOLD_SPIKE"
+    assert events[0].severity == Severity.HIGH
+
+
+def test_gold_spike_medium_severity_between_1300_and_2500():
+    detector = GoldSpikeDetector()
+    state = _make_state(current_health=1500, max_health=2000, gold=1800)
+    packet = build_context_packet(state)
+    events = detector.detect(state, packet)
+    assert len(events) == 1
+    assert events[0].event_type == "GOLD_SPIKE"
+    assert events[0].severity == Severity.MEDIUM
+
+
+def test_gold_spike_silent_below_1300():
+    detector = GoldSpikeDetector()
+    state = _make_state(current_health=1500, max_health=2000, gold=1200)
+    packet = build_context_packet(state)
+    events = detector.detect(state, packet)
+    assert events == []
+
+
+def test_gold_spike_fires_at_exactly_1300():
+    detector = GoldSpikeDetector()
+    state = _make_state(current_health=1500, max_health=2000, gold=1300)
     packet = build_context_packet(state)
     events = detector.detect(state, packet)
     assert len(events) == 1
