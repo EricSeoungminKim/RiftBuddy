@@ -77,3 +77,45 @@ def test_get_or_build_reuses_existing():
         col1 = get_or_build_collection(DATA_DIR, db_path)
         col2 = get_or_build_collection(DATA_DIR, db_path)
         assert col1.count() == col2.count()
+
+
+from backend.knowledge.retriever import retrieve
+
+
+def _make_test_collection():
+    snippets = load_champion_snippets(DATA_DIR)
+    tmp = tempfile.mkdtemp()
+    return build_collection(snippets, Path(tmp))
+
+
+def test_retrieve_known_champion():
+    col = _make_test_collection()
+    snippets = retrieve("Rumble", "Darius", None, col, top_k=3)
+    assert len(snippets) == 3
+    assert all(isinstance(s, KnowledgeSnippet) for s in snippets)
+
+
+def test_retrieve_returns_relevant_source():
+    col = _make_test_collection()
+    snippets = retrieve("Rumble", "Darius", None, col, top_k=3)
+    sources = [s.source for s in snippets]
+    assert any("rumble" in src or "darius" in src for src in sources)
+
+
+def test_retrieve_unknown_champion_fallback():
+    col = _make_test_collection()
+    # "Yone" has no seed — should still return snippets via semantic fallback
+    snippets = retrieve("Yone", "Malphite", None, col, top_k=3)
+    assert len(snippets) == 3
+
+
+def test_retrieve_no_opponents():
+    col = _make_test_collection()
+    snippets = retrieve("Ahri", None, None, col, top_k=3)
+    assert len(snippets) == 3
+
+
+def test_retrieve_with_fed_enemy():
+    col = _make_test_collection()
+    snippets = retrieve("Zed", "Ahri", "Jinx", col, top_k=3)
+    assert len(snippets) == 3
