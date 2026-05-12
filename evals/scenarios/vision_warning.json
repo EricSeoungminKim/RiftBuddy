@@ -1,0 +1,21 @@
+{
+  "name": "vision_warning",
+  "description": "10분 이후 와드 점수 낮음 — MACRO 모드",
+  "conditions": {
+    "health_percent": 75,
+    "gold": 1300,
+    "game_time_minutes": 15.0,
+    "level": 10,
+    "creep_score": 100,
+    "deaths": 0,
+    "assigned_position": "TOP",
+    "ward_score": 1.0
+  },
+  "expected": {
+    "detected_events": ["VISION_WARNING"],
+    "advice_mode": "MACRO",
+    "advice_contains": ["시야"],
+    "max_response_tokens": 150,
+    "max_latency_ms": 2000
+  }
+}

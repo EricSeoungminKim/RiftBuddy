@@ -1,0 +1,19 @@
+{
+  "name": "macro_default",
+  "description": "이벤트 없음 — MACRO 모드 기본값",
+  "conditions": {
+    "health_percent": 80,
+    "gold": 800,
+    "game_time_minutes": 8.0,
+    "level": 6,
+    "creep_score": 55,
+    "deaths": 0,
+    "assigned_position": "TOP"
+  },
+  "expected": {
+    "detected_events": [],
+    "advice_mode": "MACRO",
+    "max_response_tokens": 150,
+    "max_latency_ms": 2000
+  }
+}

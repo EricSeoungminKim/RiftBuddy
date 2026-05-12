@@ -1,0 +1,20 @@
+{
+  "name": "cs_drop_warning",
+  "description": "다이아 기준 CS 60% 이하 — MACRO 모드",
+  "conditions": {
+    "health_percent": 80,
+    "gold": 1100,
+    "game_time_minutes": 15.0,
+    "level": 10,
+    "creep_score": 50,
+    "deaths": 0,
+    "assigned_position": "TOP"
+  },
+  "expected": {
+    "detected_events": ["CS_DROP"],
+    "advice_mode": "MACRO",
+    "advice_contains": ["CS"],
+    "max_response_tokens": 150,
+    "max_latency_ms": 2000
+  }
+}

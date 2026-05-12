@@ -1,0 +1,21 @@
+{
+  "name": "death_streak_tilt",
+  "description": "3데스 이상 — DEFENSIVE 모드, 안전 플레이",
+  "conditions": {
+    "health_percent": 60,
+    "gold": 900,
+    "game_time_minutes": 15.0,
+    "level": 8,
+    "creep_score": 70,
+    "deaths": 3,
+    "assigned_position": "TOP"
+  },
+  "expected": {
+    "detected_events": ["DEATH_STREAK"],
+    "advice_mode": "DEFENSIVE",
+    "advice_contains": ["시야"],
+    "advice_contains_not": ["싸움"],
+    "max_response_tokens": 150,
+    "max_latency_ms": 2000
+  }
+}

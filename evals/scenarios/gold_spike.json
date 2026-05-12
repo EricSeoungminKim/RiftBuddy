@@ -1,0 +1,20 @@
+{
+  "name": "gold_spike_recall",
+  "description": "골드 2500+ — RECALL 모드",
+  "conditions": {
+    "health_percent": 75,
+    "gold": 2800,
+    "game_time_minutes": 12.0,
+    "level": 9,
+    "creep_score": 90,
+    "deaths": 0,
+    "assigned_position": "TOP"
+  },
+  "expected": {
+    "detected_events": ["GOLD_SPIKE"],
+    "advice_mode": "RECALL",
+    "advice_contains": ["귀환"],
+    "max_response_tokens": 150,
+    "max_latency_ms": 2000
+  }
+}

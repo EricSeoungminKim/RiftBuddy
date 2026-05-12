@@ -1,0 +1,21 @@
+{
+  "name": "low_health_danger",
+  "description": "체력 25% 이하 — DEFENSIVE 모드, 귀환 추천",
+  "conditions": {
+    "health_percent": 20,
+    "gold": 1200,
+    "game_time_minutes": 10.0,
+    "level": 7,
+    "creep_score": 65,
+    "deaths": 1,
+    "assigned_position": "TOP"
+  },
+  "expected": {
+    "detected_events": ["LOW_HEALTH"],
+    "advice_mode": "DEFENSIVE",
+    "advice_contains": ["귀환"],
+    "advice_contains_not": ["교전", "돌격"],
+    "max_response_tokens": 150,
+    "max_latency_ms": 2000
+  }
+}
