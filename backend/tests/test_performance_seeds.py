@@ -108,3 +108,38 @@ def test_save_game_seed_empty_returns_none():
     collection = client.get_or_create_collection("test_perf")
 
     assert save_game_seed(GameSession(), collection) is None
+
+
+def test_retrieve_merges_static_and_personal_seeds():
+    """retrieve() returns static seeds + personal history seeds combined."""
+    client = chromadb.EphemeralClient()
+
+    # Static collection with one Rumble snippet
+    static_col = client.get_or_create_collection("static_test")
+    static_col.add(
+        documents=["Rumble tip: use flamespitter in trades"],
+        ids=["static_rumble_1"],
+        metadatas=[{"champion": "Rumble", "source": "static"}]
+    )
+
+    # Performance collection with one personal seed for Rumble
+    perf_col = client.get_or_create_collection("perf_test")
+    perf_col.add(
+        documents=["Personal history - Rumble: 4/2/3 KDA, avg 60 CS"],
+        ids=["perf_rumble_1"],
+        metadatas=[{"champion": "Rumble", "source": "performance"}]
+    )
+
+    from backend.knowledge.retriever import retrieve
+    results = retrieve(
+        champion="Rumble",
+        lane_opponent=None,
+        fed_enemy=None,
+        collection=static_col,
+        performance_collection=perf_col,
+        query="Rumble trading tips",
+    )
+
+    assert len(results) >= 2
+    sources = [r.source for r in results]
+    assert "personal_history" in sources

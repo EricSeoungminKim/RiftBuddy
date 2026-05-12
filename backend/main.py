@@ -44,7 +44,12 @@ _event_pipeline = EventDetectorPipeline(detectors=[
     EnemyJungleUnknownDetector(),
 ])
 _knowledge_collection = None
+_performance_collection = None
 _game_poll_task: asyncio.Task | None = None
+
+
+def get_knowledge_collection():
+    return _knowledge_collection
 
 
 def _game_state_to_ws_payload(state: GameState) -> dict:
@@ -95,11 +100,14 @@ async def _poll_game_state() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    global _game_poll_task, _knowledge_collection
+    global _game_poll_task, _knowledge_collection, _performance_collection
     _knowledge_collection = get_or_build_collection(
         data_dir=Path("backend/knowledge/data"),
         db_path=Path(".chroma_db"),
     )
+    import chromadb as _chromadb_mod
+    _perf_client = _chromadb_mod.PersistentClient(path=".chroma_db")
+    _performance_collection = _perf_client.get_or_create_collection("performance_seeds")
     _game_poll_task = asyncio.create_task(_poll_game_state())
     try:
         yield
@@ -178,6 +186,7 @@ async def send_advice(websocket: WebSocket, user_query: str | None, language: st
         lane_opponent=game_state.lane_opponent,
         fed_enemy=game_state.fed_enemy,
         collection=_knowledge_collection,
+        performance_collection=_performance_collection,
     ) if _knowledge_collection is not None else []
     if knowledge_snippets:
         knowledge_block = "\n".join(

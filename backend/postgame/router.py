@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from backend.context.engine import ContextPacket
 from backend.game_session import GameSession
+from backend.knowledge.performance_seeds import save_game_seed
 from backend.llm.advisor import get_advice
 from backend.riot.live_client import GameState
 
@@ -57,6 +58,11 @@ async def add_snapshot(payload: SnapshotPayload):
 async def coach():
     if game_session.is_empty:
         raise HTTPException(status_code=400, detail="No game snapshots recorded.")
+
+    import backend.main as _main
+    collection = _main.get_knowledge_collection()
+    if collection is not None:
+        save_game_seed(game_session, collection)
 
     lines_text = "\n".join(game_session.summary_lines())
     prompt = f"""다음은 리그 오브 레전드 게임 중 30초 간격으로 기록된 상태 스냅샷입니다:
