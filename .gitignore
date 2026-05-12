@@ -42,6 +42,7 @@ out/
 
 # Runtime/generated local data
 backend/user_settings/
+backend/data/cs_benchmarks/
 *.wav
 *.mp3
 *.m4a

@@ -6,6 +6,8 @@ from contextlib import suppress
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from backend.draft.router import router as draft_router
 from backend.lcu.router import router as lcu_router
@@ -32,6 +34,7 @@ from backend.advice.planner import plan
 from backend.riot.live_client import fetch_game_state, GameState
 from backend.opgg.client import get_matchup_guide, get_champion_counters, infer_lane_opponent
 from backend.opgg.snippets import matchup_guide_to_snippet, fed_enemy_to_snippet
+from backend.stats.riot_cs_benchmarks import fetch_cs_benchmark, normalize_position
 from backend.timeline.proactive_coach import ProactiveCoachSession, generate_proactive_warning
 
 logger = logging.getLogger(__name__)
@@ -52,8 +55,19 @@ _performance_collection = None
 _game_poll_task: asyncio.Task | None = None
 _cached_lane_opponent: str | None = None  # inferred once per game session
 _lane_opponent_cache_key: str = ""        # "champion:position:enemies" to detect new game
+_draft_context: "DraftContext | None" = None
 _proactive_session: ProactiveCoachSession | None = None
 _proactive_session_key: str = ""          # "champion:position" to detect new game
+_was_game_running = False
+_last_session_snapshot_game_time: float | None = None
+_game_end_sent = False
+SESSION_SNAPSHOT_INTERVAL_SECONDS = 30.0
+
+
+class DraftContext(BaseModel):
+    my_champion: str
+    my_position: str
+    lane_opponent: str | None = None
 
 
 def get_knowledge_collection():
@@ -92,6 +106,12 @@ async def _refresh_lane_opponent_cache(state: GameState) -> None:
     global _cached_lane_opponent, _lane_opponent_cache_key
     enemy_list = list(state.enemy_champions)
     cache_key = f"{state.champion_name}:{state.assigned_position}:{','.join(sorted(enemy_list))}"
+    draft_opponent = _draft_lane_opponent_for_state(state)
+    if draft_opponent:
+        _lane_opponent_cache_key = cache_key
+        _cached_lane_opponent = draft_opponent
+        logger.info("Lane opponent from draft context: %s", draft_opponent)
+        return
     if cache_key == _lane_opponent_cache_key or not enemy_list:
         return
     _lane_opponent_cache_key = cache_key
@@ -102,6 +122,35 @@ async def _refresh_lane_opponent_cache(state: GameState) -> None:
     except Exception as exc:
         logger.warning("Lane opponent inference failed: %s", exc)
         _cached_lane_opponent = None
+
+
+def _normalize_position(position: str) -> str:
+    normalized = position.strip().upper()
+    return {
+        "TOP": "TOP",
+        "JUNGLE": "JUNGLE",
+        "MIDDLE": "MIDDLE",
+        "MID": "MIDDLE",
+        "BOTTOM": "BOTTOM",
+        "ADC": "BOTTOM",
+        "UTILITY": "UTILITY",
+        "SUPPORT": "UTILITY",
+        "탑": "TOP",
+        "정글": "JUNGLE",
+        "미드": "MIDDLE",
+        "바텀": "BOTTOM",
+        "서폿": "UTILITY",
+    }.get(normalized, normalized)
+
+
+def _draft_lane_opponent_for_state(state: GameState) -> str | None:
+    if _draft_context is None or not _draft_context.lane_opponent:
+        return None
+    if _draft_context.my_champion.strip().lower() != state.champion_name.strip().lower():
+        return None
+    if _normalize_position(_draft_context.my_position) != _normalize_position(state.assigned_position):
+        return None
+    return _draft_context.lane_opponent
 
 
 async def _ensure_proactive_session(state: GameState) -> None:
@@ -152,7 +201,47 @@ async def _run_proactive_checks(state: GameState) -> None:
             logger.warning("Proactive warning generation failed: %s", exc)
 
 
+def _record_session_snapshot(state: GameState, *, force: bool = False) -> bool:
+    global _last_session_snapshot_game_time
+    if force or _last_session_snapshot_game_time is None:
+        _game_session.add_snapshot(state)
+        _last_session_snapshot_game_time = state.game_time
+        return True
+    if state.game_time < _last_session_snapshot_game_time:
+        _game_session.clear()
+        _game_session.add_snapshot(state)
+        _last_session_snapshot_game_time = state.game_time
+        return True
+    if state.game_time - _last_session_snapshot_game_time >= SESSION_SNAPSHOT_INTERVAL_SECONDS:
+        _game_session.add_snapshot(state)
+        _last_session_snapshot_game_time = state.game_time
+        return True
+    return False
+
+
+async def _broadcast_game_end() -> None:
+    global _game_end_sent
+    if _game_end_sent:
+        return
+    _game_end_sent = True
+    for ws in list(active_websockets):
+        try:
+            await ws.send_json({"type": "game_end"})
+        except Exception:
+            active_websockets.discard(ws)
+
+
+def _reset_live_game_state() -> None:
+    global _cached_lane_opponent, _lane_opponent_cache_key, _draft_context, _proactive_session_key, _last_session_snapshot_game_time
+    _cached_lane_opponent = None
+    _lane_opponent_cache_key = ""
+    _draft_context = None
+    _proactive_session_key = ""
+    _last_session_snapshot_game_time = None
+
+
 async def _poll_game_state() -> None:
+    global _was_game_running, _game_end_sent
     while True:
         await asyncio.sleep(3)
         try:
@@ -161,9 +250,20 @@ async def _poll_game_state() -> None:
             logger.warning("Game state poll error: %s", exc)
             continue
         if state is None:
-            _lane_opponent_cache_key = ""  # reset on game end
-            _proactive_session_key = ""
+            if _was_game_running and not _game_session.is_empty:
+                await _broadcast_game_end()
+            _was_game_running = False
+            _reset_live_game_state()
             continue
+        if not _was_game_running:
+            previous_game_time = None
+            if not _game_session.is_empty:
+                previous_game_time = _game_session.snapshots[-1].game_time
+            if _game_end_sent and previous_game_time is not None and state.game_time < previous_game_time:
+                _game_session.clear()
+            _game_end_sent = False
+        _was_game_running = True
+        _record_session_snapshot(state)
         asyncio.create_task(_refresh_lane_opponent_cache(state))
         asyncio.create_task(_ensure_proactive_session(state))
         asyncio.create_task(_run_proactive_checks(state))
@@ -215,6 +315,34 @@ app.include_router(postgame_router)
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/game/state")
+async def get_game_state():
+    state = await fetch_game_state()
+    if state is None:
+        return JSONResponse(status_code=503, content={"status": "no_game"})
+    return _game_state_to_ws_payload(state)
+
+
+@app.post("/game/draft-context")
+async def set_draft_context(ctx: DraftContext):
+    global _cached_lane_opponent, _lane_opponent_cache_key, _draft_context
+    normalized_ctx = DraftContext(
+        my_champion=ctx.my_champion.strip(),
+        my_position=_normalize_position(ctx.my_position),
+        lane_opponent=ctx.lane_opponent.strip() if ctx.lane_opponent else None,
+    )
+    _draft_context = normalized_ctx
+    _cached_lane_opponent = normalized_ctx.lane_opponent
+    _lane_opponent_cache_key = f"{normalized_ctx.my_champion}:{normalized_ctx.my_position}:from_draft"
+    logger.info(
+        "Draft context cached: champion=%s position=%s opponent=%s",
+        normalized_ctx.my_champion,
+        normalized_ctx.my_position,
+        normalized_ctx.lane_opponent,
+    )
+    return {"ok": True}
 
 
 @app.websocket("/ws")
@@ -283,20 +411,67 @@ async def _fetch_opgg_snippets(state: GameState) -> list:
     return snippets
 
 
+async def _fetch_riot_cs_snippet(state: GameState):
+    from backend.knowledge.schemas import KnowledgeSnippet
+
+    riot_key = CONFIG.get("riot_api_key", "")
+    if not riot_key or state.game_time <= 0 or state.creep_score < 0:
+        return None
+    try:
+        tier = CONFIG.get("riot_benchmark_tier", "DIAMOND")
+        benchmark = await fetch_cs_benchmark(
+            riot_key,
+            state.champion_name,
+            state.assigned_position,
+            region=CONFIG.get("riot_region", "KR"),
+            tier=tier,
+            target_samples=int(CONFIG.get("riot_benchmark_samples", "25")),
+            matches_per_player=int(CONFIG.get("riot_benchmark_matches_per_player", "3")),
+            ttl_seconds=int(CONFIG.get("riot_benchmark_ttl_seconds", "604800")),
+        )
+    except Exception as exc:
+        logger.warning("Riot CS benchmark fetch failed: %s", exc)
+        return None
+    if not benchmark or benchmark.avg_cspm <= 0:
+        return None
+
+    game_minutes = state.game_time / 60
+    current_cspm = state.creep_score / game_minutes
+    diff_pct = round((current_cspm / benchmark.avg_cspm - 1.0) * 100)
+    sign = "+" if diff_pct >= 0 else ""
+    curve_text = _cs_curve_text(benchmark.cs_at, game_minutes)
+    content = (
+        f"Riot Match-V5 CS benchmark: {state.champion_name} {normalize_position(state.assigned_position)} "
+        f"current {state.creep_score} CS at {game_minutes:.1f}m ({current_cspm:.1f} CS/min) vs "
+        f"{tier} average {benchmark.avg_cspm:.1f} CS/min ({sign}{diff_pct}%, n={benchmark.samples})."
+    )
+    if curve_text:
+        content += f" Timeline averages: {curve_text}."
+    return KnowledgeSnippet(
+        source=f"riot_cs_benchmark:{state.champion_name}:{normalize_position(state.assigned_position)}:{tier}",
+        content=content,
+        relevance="high",
+    )
+
+
+def _cs_curve_text(cs_at: dict[str, float], game_minutes: float) -> str:
+    visible_points = [
+        f"{minute}m {cs:g} CS"
+        for minute, cs in sorted(cs_at.items(), key=lambda item: int(item[0]))
+        if int(minute) <= game_minutes + 1
+    ]
+    return ", ".join(visible_points)
+
+
 async def send_advice(websocket: WebSocket, user_query: str | None, language: str, planned: bool = False, opgg_only: bool = False) -> None:
     game_state = await fetch_game_state()
     if game_state is None:
         await websocket.send_json({"type": "error", "message": "Game not running"})
         if not _game_session.is_empty:
-            for ws in list(active_websockets):
-                try:
-                    await ws.send_json({"type": "game_end"})
-                except Exception:
-                    pass
-            _game_session.clear()
+            await _broadcast_game_end()
         return
 
-    _game_session.add_snapshot(game_state)
+    _record_session_snapshot(game_state, force=True)
 
     if planned and not user_query:
         user_query = build_planned_question(game_state, language)
@@ -310,6 +485,7 @@ async def send_advice(websocket: WebSocket, user_query: str | None, language: st
     if opgg_only:
         knowledge_snippets = opgg_snippets
     else:
+        riot_cs_snippet = await _fetch_riot_cs_snippet(game_state)
         rag_snippets = retrieve(
             champion=game_state.champion_name,
             lane_opponent=game_state.lane_opponent,
@@ -317,7 +493,7 @@ async def send_advice(websocket: WebSocket, user_query: str | None, language: st
             collection=_knowledge_collection,
             performance_collection=_performance_collection,
         ) if _knowledge_collection is not None else []
-        knowledge_snippets = opgg_snippets + rag_snippets
+        knowledge_snippets = opgg_snippets + ([riot_cs_snippet] if riot_cs_snippet else []) + rag_snippets
 
     advice_request = plan(detected_events, knowledge_snippets)
     advice = await get_advice(packet, user_query=user_query, language=language, advice_request=advice_request)

@@ -6,6 +6,7 @@ embeds it into a ChromaDB ``performance_seeds`` collection.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -16,6 +17,9 @@ if TYPE_CHECKING:
 
 
 COLLECTION_NAME = "performance_seeds"
+logger = logging.getLogger(__name__)
+CS_PER_MIN_FIELDS = ("cs_per_min", "cspm")
+CS_PER_GAME_FIELDS = ("minion_kill_per_game", "cs", "avg_cs")
 
 
 def _ts(game_time: float) -> str:
@@ -34,6 +38,7 @@ class GameSummary:
     avg_cs: float
     avg_gold_diff: float
     game_duration_minutes: float
+    final_cs: int | None = None
     lane_opponent: str | None = None
     ally_champions: tuple[str, ...] = field(default_factory=tuple)
     enemy_champions: tuple[str, ...] = field(default_factory=tuple)
@@ -109,6 +114,7 @@ def summarize_session(session: "GameSession") -> GameSummary | None:
         avg_cs=avg_cs,
         avg_gold_diff=avg_gold_diff,
         game_duration_minutes=duration_minutes,
+        final_cs=last.creep_score,
         lane_opponent=lane_opponent,
         ally_champions=ally_champions,
         enemy_champions=enemy_champions,
@@ -157,6 +163,21 @@ _TREND_LABELS = {
     "consistent": "전 구간 안정적인 퍼포먼스",
     "declined": "후반으로 갈수록 퍼포먼스 저하",
 }
+
+
+def _numeric_stat(data: dict, fields: tuple[str, ...]) -> tuple[str, float] | None:
+    for field_name in fields:
+        value = data.get(field_name)
+        if isinstance(value, (int, float)) and value > 0:
+            return field_name, float(value)
+        if isinstance(value, str):
+            try:
+                parsed = float(value.replace("%", ""))
+            except ValueError:
+                continue
+            if parsed > 0:
+                return field_name, parsed
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -256,6 +277,7 @@ def save_game_seed(
     collection: "chromadb.Collection",
     opgg_match: dict | None = None,
     opgg_avg_stats: dict | None = None,
+    avg_stats_source: str = "OP.GG",
 ) -> str | None:
     if session.is_empty:
         return None
@@ -297,10 +319,24 @@ def save_game_seed(
             .get("summary", {})
             .get("average_stats", {})
         )
-        avg_cs_per_min = avg_data.get("cs_per_min")
-        if avg_cs_per_min and summary.game_duration_minutes > 0:
-            my_cs_per_min = summary.avg_cs / summary.game_duration_minutes
+        cspm_stat = _numeric_stat(avg_data, CS_PER_MIN_FIELDS)
+        cs_game_stat = _numeric_stat(avg_data, CS_PER_GAME_FIELDS)
+        if cspm_stat and summary.game_duration_minutes > 0:
+            field_name, avg_cs_per_min = cspm_stat
+            comparison_cs = summary.final_cs if summary.final_cs is not None else summary.avg_cs
+            my_cs_per_min = comparison_cs / summary.game_duration_minutes
             summary.cs_vs_avg_pct = my_cs_per_min / avg_cs_per_min
+            logger.info("%s average CS comparison used average_stats.%s", avg_stats_source, field_name)
+        elif cs_game_stat:
+            field_name, avg_cs_per_game = cs_game_stat
+            summary.cs_vs_avg_pct = summary.avg_cs / avg_cs_per_game
+            logger.info("%s average CS comparison used average_stats.%s", avg_stats_source, field_name)
+        elif avg_data:
+            logger.info(
+                "%s average_stats did not include CS comparison fields. Available keys: %s",
+                avg_stats_source,
+                sorted(avg_data.keys()),
+            )
 
     seed_text = generate_seed_text(summary)
     return embed_performance_seed(collection, summary, seed_text)

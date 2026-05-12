@@ -68,6 +68,7 @@ Each champion file lives at `backend/knowledge/data/{champion_name}.json` (lower
 **10 seeded champions:** rumble, garen, darius, jinx, thresh, leesin, ahri, zed, yasuo, vi
 
 Each champion has:
+
 - Full `gameplan` block (summary, power_spikes, win_condition, early_game, positioning)
 - 4–6 `matchups` entries covering common lane opponents
 
@@ -80,6 +81,7 @@ Each champion has:
 Reads all JSON files from `data/`, flattens into a list of `KnowledgeSnippet`s.
 
 Each snippet gets a `source` tag:
+
 - `"champion:rumble:gameplan"` — for gameplan content
 - `"champion:rumble:matchup:darius"` — for matchup-specific tips
 
@@ -120,6 +122,7 @@ def retrieve(
 ```
 
 **Query construction:**
+
 - If lane_opponent and fed_enemy known:
   `"Rumble top lane gameplan against Darius. Most fed enemy: Jinx."`
 - If only champion known (no seed exists for opponents):
@@ -151,6 +154,7 @@ def _infer_fed_enemy(data: dict, active_player: dict) -> str | None:
 Both helpers read from `allPlayers[].position` and `allPlayers[].scores.kills` — already present in the Live Client API `/allgamedata` response.
 
 Update `get_fake_game_state()` to include:
+
 ```python
 lane_opponent="Tryndamere",
 fed_enemy="Darius",
@@ -188,10 +192,10 @@ if snippets:
 
 ## Tech Stack
 
-| Library | Version | Purpose |
-|---|---|---|
-| `sentence-transformers` | >=2.7 | Local embeddings, `all-MiniLM-L6-v2` model |
-| `chromadb` | >=0.5 | Local persistent vector store |
+| Library                 | Version | Purpose                                    |
+| ----------------------- | ------- | ------------------------------------------ |
+| `sentence-transformers` | >=2.7   | Local embeddings, `all-MiniLM-L6-v2` model |
+| `chromadb`              | >=0.5   | Local persistent vector store              |
 
 Both are zero-cost, CPU-compatible, no API key required.
 
@@ -203,18 +207,18 @@ All tests run without a live game (fake game state).
 
 ### `backend/tests/test_knowledge.py`
 
-| Test | What it verifies |
-|---|---|
-| `test_loader_returns_snippets` | loader returns non-empty list from data dir |
-| `test_loader_snippet_sources` | source tags follow `champion:X:gameplan` / `champion:X:matchup:Y` format |
-| `test_build_collection` | collection builds without error, contains expected doc count |
-| `test_retrieve_known_champion` | returns 3 snippets for Rumble vs Darius |
-| `test_retrieve_unknown_champion_fallback` | returns snippets even when champion has no seed |
-| `test_retrieve_no_opponents` | returns snippets for champion-only query |
-| `test_lane_opponent_extraction` | `_infer_lane_opponent` returns correct enemy for TOP position |
-| `test_fed_enemy_extraction` | `_infer_fed_enemy` returns enemy with highest kills |
-| `test_fed_enemy_all_zero` | returns None when all enemies have 0 kills |
-| `test_main_send_advice_includes_knowledge` | end-to-end: knowledge block appears in LLM prompt |
+| Test                                       | What it verifies                                                         |
+| ------------------------------------------ | ------------------------------------------------------------------------ |
+| `test_loader_returns_snippets`             | loader returns non-empty list from data dir                              |
+| `test_loader_snippet_sources`              | source tags follow `champion:X:gameplan` / `champion:X:matchup:Y` format |
+| `test_build_collection`                    | collection builds without error, contains expected doc count             |
+| `test_retrieve_known_champion`             | returns 3 snippets for Rumble vs Darius                                  |
+| `test_retrieve_unknown_champion_fallback`  | returns snippets even when champion has no seed                          |
+| `test_retrieve_no_opponents`               | returns snippets for champion-only query                                 |
+| `test_lane_opponent_extraction`            | `_infer_lane_opponent` returns correct enemy for TOP position            |
+| `test_fed_enemy_extraction`                | `_infer_fed_enemy` returns enemy with highest kills                      |
+| `test_fed_enemy_all_zero`                  | returns None when all enemies have 0 kills                               |
+| `test_main_send_advice_includes_knowledge` | end-to-end: knowledge block appears in LLM prompt                        |
 
 ### Smoke test (no live game)
 

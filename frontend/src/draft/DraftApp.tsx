@@ -13,6 +13,7 @@ function GameEndListener() {
         const data = JSON.parse(event.data)
         if (data.type === 'game_end') {
           navigate('/postgame')
+          window.riftBuddy?.showPostGameWindow?.()
         }
       } catch {
         // non-JSON messages (plain text advice) — ignore

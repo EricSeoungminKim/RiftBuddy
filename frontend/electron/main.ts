@@ -1,7 +1,11 @@
-import { app, BrowserWindow, globalShortcut } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain } from "electron";
 import { exec } from "child_process";
 import path from "path";
-import { nextChampSelectVisibilityState } from "./champSelectTracking";
+import {
+  DraftContextPayload,
+  draftContextFromChampSelectStatus,
+  nextChampSelectVisibilityState,
+} from "./champSelectTracking";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -11,6 +15,7 @@ let leagueTrackInterval: ReturnType<typeof setInterval> | null = null;
 let champSelectInterval: ReturnType<typeof setInterval> | null = null;
 let wasInChampSelect = false;
 let lastChampSelectDebugKey = "";
+let lastDraftContext: DraftContextPayload | null = null;
 const API_BASE = process.env.VITE_RIFTBUDDY_API_URL ?? "http://127.0.0.1:8001";
 
 function logChampSelectState(inProgress: boolean, draftVisible: boolean): void {
@@ -58,8 +63,8 @@ function createOverlayWindow(): BrowserWindow {
 
 function createDraftWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1240,
+    height: 860,
     transparent: false,
     frame: true,
     alwaysOnTop: true,
@@ -171,9 +176,17 @@ function startChampSelectTracking(): void {
       }
       const data = await response.json();
       const draftVisible = Boolean(draftWin?.isVisible());
-      logChampSelectState(Boolean(data?.inProgress), draftVisible);
+      const inProgress = Boolean(data?.inProgress);
+      const previousWasInChampSelect = wasInChampSelect;
+      logChampSelectState(inProgress, draftVisible);
+      if (inProgress) {
+        lastDraftContext = draftContextFromChampSelectStatus(data) ?? lastDraftContext;
+      } else if (previousWasInChampSelect && lastDraftContext) {
+        void sendDraftContext(lastDraftContext);
+        lastDraftContext = null;
+      }
       const nextState = nextChampSelectVisibilityState(
-        Boolean(data?.inProgress),
+        inProgress,
         wasInChampSelect,
         draftVisible,
       );
@@ -194,6 +207,30 @@ function startChampSelectTracking(): void {
   };
   void poll();
   champSelectInterval = setInterval(poll, 2500);
+}
+
+async function sendDraftContext(context: DraftContextPayload): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE}/game/draft-context`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(context),
+    });
+    if (!response.ok) {
+      console.log(`RiftBuddy draft context send failed: HTTP ${response.status}`);
+    }
+  } catch (error) {
+    console.log(`RiftBuddy draft context send error: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function showPostGameWindow(): void {
+  draftWin?.setAlwaysOnTop(true, "screen-saver", 1);
+  app.focus({ steal: true });
+  draftWin?.showInactive();
+  draftWin?.show();
+  draftWin?.moveTop();
+  draftWin?.focus();
 }
 
 app.whenReady().then(() => {
@@ -233,6 +270,10 @@ app.whenReady().then(() => {
       draftWin?.moveTop();
       draftWin?.focus();
     }
+  });
+
+  ipcMain.on("riftbuddy:show-postgame-window", () => {
+    showPostGameWindow();
   });
 });
 

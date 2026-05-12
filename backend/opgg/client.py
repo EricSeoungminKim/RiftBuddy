@@ -150,8 +150,8 @@ async def get_champion_analysis_for_comparison(
         "champion": _to_opgg_name(champion),
         "position": _to_opgg_position(position),
         "desired_output_fields": [
-            "data.summary.average_stats.{win_rate,kda,pick_rate}",
-            "data.summary.positions[].stats.{win_rate,kda}",
+            "data.summary.average_stats",
+            "data.summary.positions[].stats",
         ],
     })
 

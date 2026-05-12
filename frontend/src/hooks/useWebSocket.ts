@@ -5,6 +5,8 @@ import type { ServerMessage } from "../types";
 export interface ChatMessage {
   role: "user" | "buddy" | "system";
   text: string;
+  source?: "ai" | "opgg" | "proactive" | "status";
+  createdAt: string;
 }
 
 const MAX_MESSAGES = 20;
@@ -20,9 +22,16 @@ export function useWebSocket() {
   const [lastAdvice, setLastAdvice] = useState<string | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [audioQueue, setAudioQueue] = useState<ArrayBuffer[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const ws = useRef<WebSocket | null>(null);
+  const pendingAdviceSource = useRef<ChatMessage["source"]>("ai");
+
+  const appendMessage = useCallback((message: Omit<ChatMessage, "createdAt">) => {
+    setMessages((items) => [
+      ...items.slice(-(MAX_MESSAGES - 1)),
+      { ...message, createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) },
+    ]);
+  }, []);
 
   useEffect(() => {
     let reconnectTimer: number | undefined;
@@ -45,21 +54,21 @@ export function useWebSocket() {
           const msg: ServerMessage = JSON.parse(event.data);
           if (msg.type === "advice") {
             setLastAdvice(msg.text);
-            setLastError(msg.audio_error ?? null);
-            setMessages((items) => [...items.slice(-(MAX_MESSAGES - 1)), { role: "buddy", text: msg.text }]);
+            appendMessage({ role: "buddy", text: msg.text, source: pendingAdviceSource.current ?? "ai" });
+            pendingAdviceSource.current = "ai";
           } else if (msg.type === "proactive_warning") {
             setLastAdvice(msg.text);
-            setMessages((items) => [...items.slice(-(MAX_MESSAGES - 1)), { role: "buddy", text: msg.text }]);
+            appendMessage({ role: "buddy", text: msg.text, source: "proactive" });
           } else if (msg.type === "transcript") {
-            setMessages((items) => [...items.slice(-(MAX_MESSAGES - 1)), { role: "user", text: msg.text }]);
-          } else if (msg.type === "listening") {
-            setMessages((items) => [...items.slice(-(MAX_MESSAGES - 1)), { role: "buddy", text: msg.text }]);
+            appendMessage({ role: "user", text: msg.text });
+          } else if (msg.type === "game_state") {
+            return;
+          } else if (msg.type === "game_end") {
+            appendMessage({ role: "system", text: "게임이 종료됐어요. 포스트게임 분석을 확인할 수 있어요." });
           } else {
             setLastError(msg.message);
-            setMessages((items) => [...items.slice(-(MAX_MESSAGES - 1)), { role: "system", text: msg.message }]);
+            appendMessage({ role: "system", text: msg.message });
           }
-        } else if (event.data instanceof Blob) {
-          event.data.arrayBuffer().then((buf) => setAudioQueue((q) => [...q, buf]));
         }
       };
     };
@@ -73,43 +82,42 @@ export function useWebSocket() {
       }
       ws.current?.close();
     };
-  }, []);
+  }, [appendMessage]);
 
   const sendQuery = useCallback((query: string | null, language = "ko") => {
     if (ws.current?.readyState === WebSocket.OPEN) {
+      pendingAdviceSource.current = "ai";
       if (query) {
-        setMessages((items) => [...items.slice(-(MAX_MESSAGES - 1)), { role: "user", text: query }]);
+        appendMessage({ role: "user", text: query });
       }
       ws.current.send(JSON.stringify({ query, language }));
     }
-  }, []);
-
-  const requestVoiceQuestion = useCallback((language = "ko") => {
-    if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({ action: "listen", language }));
-    }
-  }, []);
+  }, [appendMessage]);
 
   const requestPlannedAdvice = useCallback((language = "ko") => {
     if (ws.current?.readyState === WebSocket.OPEN) {
+      pendingAdviceSource.current = "ai";
       ws.current.send(JSON.stringify({ action: "advice", mode: "planned", query: null, language }));
     }
   }, []);
 
   const requestMatchup = useCallback((language = "ko") => {
     if (ws.current?.readyState === WebSocket.OPEN) {
+      pendingAdviceSource.current = "opgg";
       ws.current.send(JSON.stringify({ action: "matchup", query: null, language }));
     }
   }, []);
 
   const requestItems = useCallback((language = "ko") => {
     if (ws.current?.readyState === WebSocket.OPEN) {
+      pendingAdviceSource.current = "ai";
       ws.current.send(JSON.stringify({ action: "items", query: null, language }));
     }
   }, []);
 
   const requestMacro = useCallback((language = "ko") => {
     if (ws.current?.readyState === WebSocket.OPEN) {
+      pendingAdviceSource.current = "ai";
       ws.current.send(JSON.stringify({ action: "macro", query: null, language }));
     }
   }, []);
@@ -118,10 +126,8 @@ export function useWebSocket() {
     lastAdvice,
     lastError,
     isConnected,
-    audioQueue,
     messages,
     sendQuery,
-    requestVoiceQuestion,
     requestPlannedAdvice,
     requestMatchup,
     requestItems,

@@ -64,7 +64,7 @@ WebSocket → Electron Overlay (frontend/)
 
 - `advice` — standard LLM advice response
 - `proactive_warning` — auto-triggered danger window warning (no user prompt)
-- `transcript` — STT transcript echo
+- `transcript` — planned-advice question echo (shown as USER bubble before AI reply)
 - `game_state` — live game state broadcast
 - `game_end` — game over signal
 - `error` — error message
@@ -73,8 +73,6 @@ WebSocket → Electron Overlay (frontend/)
 
 ```
 ANTHROPIC_API_KEY=
-ELEVENLABS_API_KEY=
-ELEVENLABS_VOICE_ID=
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
 RIOT_GAME_NAME=        # Riot ID game name (e.g. "Hide on bush")
@@ -196,22 +194,22 @@ if avg_cs_per_min and summary.game_duration_minutes > 0:
 
 #### What's fully implemented (as of this handoff)
 
-| Feature | Module |
-| --- | --- |
-| Live game state polling (3s) | `backend/riot/live_client.py`, `backend/main.py` |
-| 9 event detectors | `backend/timeline/detectors/` |
-| OP.GG MCP live matchup + fed-enemy snippets | `backend/opgg/client.py`, `backend/opgg/snippets.py` |
-| Lane opponent inference via role_rate | `backend/opgg/client.py` → `infer_lane_opponent()` |
-| ChromaDB RAG (champion knowledge + performance seeds) | `backend/knowledge/` |
-| Advice planning layer | `backend/advice/planner.py` |
-| Multi-provider LLM (Anthropic / Groq / Gemini / mock) | `backend/llm/advisor.py` |
-| Proactive pattern-based warnings (auto-push) | `backend/timeline/proactive_coach.py` |
-| After-game seed with OP.GG op_score + timeline trend | `backend/knowledge/performance_seeds.py` |
-| Draft assistant (champion select phase) | `frontend/src/draft/`, `backend/draft/` |
-| Post-game coaching report | `backend/postgame/router.py` |
-| Hotkeys: B / C / 1 / 2 | `frontend/electron/main.ts` |
-| Eval suite (6 scenarios) | `evals/run_evals.py` |
-| 107 backend tests | `backend/tests/` |
+| Feature                                               | Module                                               |
+| ----------------------------------------------------- | ---------------------------------------------------- |
+| Live game state polling (3s)                          | `backend/riot/live_client.py`, `backend/main.py`     |
+| 9 event detectors                                     | `backend/timeline/detectors/`                        |
+| OP.GG MCP live matchup + fed-enemy snippets           | `backend/opgg/client.py`, `backend/opgg/snippets.py` |
+| Lane opponent inference via role_rate                 | `backend/opgg/client.py` → `infer_lane_opponent()`   |
+| ChromaDB RAG (champion knowledge + performance seeds) | `backend/knowledge/`                                 |
+| Advice planning layer                                 | `backend/advice/planner.py`                          |
+| Multi-provider LLM (Anthropic / Groq / Gemini / mock) | `backend/llm/advisor.py`                             |
+| Proactive pattern-based warnings (auto-push)          | `backend/timeline/proactive_coach.py`                |
+| After-game seed with OP.GG op_score + timeline trend  | `backend/knowledge/performance_seeds.py`             |
+| Draft assistant (champion select phase)               | `frontend/src/draft/`, `backend/draft/`              |
+| Post-game coaching report                             | `backend/postgame/router.py`                         |
+| Hotkeys: B / C / 1 / 2                                | `frontend/electron/main.ts`                          |
+| Eval suite (6 scenarios)                              | `evals/run_evals.py`                                 |
+| 107 backend tests                                     | `backend/tests/`                                     |
 
 #### 5a — README.md
 
@@ -223,12 +221,19 @@ Write `README.md` at repo root with this structure:
 [Demo GIF — record with TEST_MODE=1]
 
 ## What it does
-## Architecture  ← Mermaid diagram (see below)
+
+## Architecture ← Mermaid diagram (see below)
+
 ## Key Technical Challenges
-## Evaluation Results  ← run evals/run_evals.py, paste table
+
+## Evaluation Results ← run evals/run_evals.py, paste table
+
 ## Quick Start
+
 ## Hotkeys
+
 ## Environment Variables
+
 ## Resume
 ```
 
@@ -272,9 +277,11 @@ Create `docs/DEMO.md` with step-by-step instructions for anyone evaluating the p
 Add to README under a collapsible `<details><summary>Resume</summary>` section:
 
 **Standard:**
+
 > Built a real-time AI League coaching overlay with FastAPI, WebSockets, Electron, Riot Live Client API, and multi-provider LLM integration; added 9-detector event pipeline, OP.GG MCP live data integration, champion knowledge RAG, advice planning layer, proactive pattern-based coaching from historical seeds, and automated eval suite.
 
 **Strong:**
+
 > Designed a real-time AI inference platform for League of Legends that transforms live game telemetry into prioritized coaching signals via a deterministic event detection pipeline (9 detectors), OP.GG MCP live matchup data, champion/matchup knowledge retrieval (ChromaDB + sentence-transformers), and an advice planning layer before LLM dispatch. Includes proactive coaching that auto-triggers pattern-based warnings from historical performance seeds without user prompting.
 
 **Files to create/change:** `README.md`, `docs/DEMO.md`

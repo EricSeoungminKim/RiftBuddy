@@ -5,19 +5,9 @@ import { StatusBar } from "./StatusBar";
 import { TabBar } from "./overlay/TabBar";
 
 export function Overlay() {
-  const { lastError, isConnected, audioQueue, messages, requestVoiceQuestion, requestPlannedAdvice, requestMatchup, requestItems, requestMacro } = useWebSocket();
+  const { lastError, isConnected, messages, requestPlannedAdvice, requestMatchup, requestItems, requestMacro } = useWebSocket();
   const [language, setLanguage] = useState((import.meta.env.VITE_RIFTBUDDY_RESPONSE_LANGUAGE as string) ?? "ko");
   const scrollRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (audioQueue.length === 0) return;
-    const buf = audioQueue[audioQueue.length - 1];
-    const blob = new Blob([buf], { type: "audio/mpeg" });
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    audio.play().catch(() => {});
-    return () => URL.revokeObjectURL(url);
-  }, [audioQueue]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -31,7 +21,7 @@ export function Overlay() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [language, requestPlannedAdvice, requestVoiceQuestion]);
+  }, [language, requestPlannedAdvice, requestMatchup, requestItems, requestMacro]);
 
   useEffect(() => {
     return window.riftBuddy?.onRequestAdvice(() => requestPlannedAdvice(language));
@@ -50,10 +40,6 @@ export function Overlay() {
   }, [language, requestMacro]);
 
   useEffect(() => {
-    return window.riftBuddy?.onRequestVoiceQuestion(() => requestVoiceQuestion(language));
-  }, [language, requestVoiceQuestion]);
-
-  useEffect(() => {
     return window.riftBuddy?.onToggleLanguage(() => {
       setLanguage((current) => (current === "ko" ? "en" : "ko"));
     });
@@ -66,12 +52,12 @@ export function Overlay() {
   return (
     <div
       style={{
-        width: 500,
+        width: 420,
         height: 420,
         padding: 10,
         boxSizing: "border-box",
         pointerEvents: "auto",
-        background: "linear-gradient(140deg, rgba(9,12,18,0.18), rgba(20,52,48,0.09))",
+        background: "linear-gradient(140deg, rgba(9,12,18,0.20), rgba(20,52,48,0.12))",
         borderRadius: 10,
       }}
     >
@@ -92,7 +78,13 @@ export function Overlay() {
       >
         {lastError && <AdviceCard role="system" text={lastError} />}
         {messages.map((message, index) => (
-          <AdviceCard key={`${message.role}-${index}-${message.text}`} role={message.role} text={message.text} />
+          <AdviceCard
+            key={`${message.role}-${index}-${message.text}`}
+            role={message.role}
+            text={message.text}
+            source={message.source}
+            createdAt={message.createdAt}
+          />
         ))}
       </div>
     </div>

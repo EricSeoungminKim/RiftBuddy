@@ -65,6 +65,7 @@ def test_summarize_session_stats():
     assert summary.kills == 4
     assert summary.deaths == 2
     assert summary.avg_cs == 60.0
+    assert summary.final_cs == 120
     assert summary.game_duration_minutes == 20.0
 
 
@@ -108,6 +109,36 @@ def test_save_game_seed_empty_returns_none():
     collection = client.get_or_create_collection("test_perf")
 
     assert save_game_seed(GameSession(), collection) is None
+
+
+def test_save_game_seed_uses_cs_per_min_average():
+    client = chromadb.EphemeralClient()
+    collection = client.get_or_create_collection("test_perf_cspm")
+    session = _three_snap_session()
+
+    doc_id = save_game_seed(
+        session,
+        collection,
+        opgg_avg_stats={"data": {"summary": {"average_stats": {"cs_per_min": 2.0}}}},
+    )
+
+    result = collection.get(ids=[doc_id])
+    assert "CS vs Diamond avg: +200%" in result["documents"][0]
+
+
+def test_save_game_seed_skips_missing_opgg_cs_fields():
+    client = chromadb.EphemeralClient()
+    collection = client.get_or_create_collection("test_perf_no_cs")
+    session = _three_snap_session()
+
+    doc_id = save_game_seed(
+        session,
+        collection,
+        opgg_avg_stats={"data": {"summary": {"average_stats": {"win_rate": 0.49, "kda": 2.02}}}},
+    )
+
+    result = collection.get(ids=[doc_id])
+    assert "CS vs Diamond avg" not in result["documents"][0]
 
 
 def test_retrieve_merges_static_and_personal_seeds():

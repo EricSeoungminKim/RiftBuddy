@@ -22,12 +22,6 @@ contextBridge.exposeInMainWorld("riftBuddy", {
     ipcRenderer.on("riftbuddy:request-macro", handler);
     return () => ipcRenderer.removeListener("riftbuddy:request-macro", handler);
   },
-  onRequestVoiceQuestion: (callback: () => void) => {
-    const handler = () => callback();
-    ipcRenderer.on("riftbuddy:request-voice-question", handler);
-    return () =>
-      ipcRenderer.removeListener("riftbuddy:request-voice-question", handler);
-  },
   onToggleLanguage: (callback: () => void) => {
     const handler = () => callback();
     ipcRenderer.on("riftbuddy:toggle-language", handler);
@@ -49,5 +43,6 @@ contextBridge.exposeInMainWorld("riftBuddy", {
     ipcRenderer.on("riftbuddy:league-bounds", handler);
     return () => ipcRenderer.removeListener("riftbuddy:league-bounds", handler);
   },
+  showPostGameWindow: () => ipcRenderer.send("riftbuddy:show-postgame-window"),
   exitSettingsMode: () => ipcRenderer.send("riftbuddy:exit-settings-mode"),
 });

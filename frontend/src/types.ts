@@ -1,7 +1,6 @@
 export interface AdviceMessage {
   type: "advice";
   text: string;
-  audio_error?: string | null;
   context: {
     health_percent: number;
     gold: number;
@@ -20,19 +19,24 @@ export interface TranscriptMessage {
   text: string;
 }
 
-export interface ListeningMessage {
-  type: "listening";
-  text: string;
-}
-
 export interface ProactiveWarningMessage {
   type: "proactive_warning";
   text: string;
+}
+
+export interface GameStateMessage {
+  type: "game_state";
+  [key: string]: unknown;
+}
+
+export interface GameEndMessage {
+  type: "game_end";
 }
 
 export type ServerMessage =
   | AdviceMessage
   | ErrorMessage
   | TranscriptMessage
-  | ListeningMessage
-  | ProactiveWarningMessage;
+  | ProactiveWarningMessage
+  | GameStateMessage
+  | GameEndMessage;

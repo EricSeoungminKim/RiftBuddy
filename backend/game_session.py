@@ -6,12 +6,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from backend.riot.live_client import GameState
 
-MAX_SNAPSHOTS = 60
+MAX_SNAPSHOTS = 120
 
 
 @dataclass
 class GameSession:
     snapshots: list["GameState"] = field(default_factory=list)
+    seed_doc_id: str | None = None
 
     def add_snapshot(self, state: "GameState") -> None:
         if len(self.snapshots) >= MAX_SNAPSHOTS:
@@ -20,6 +21,7 @@ class GameSession:
 
     def clear(self) -> None:
         self.snapshots.clear()
+        self.seed_doc_id = None
 
     @property
     def is_empty(self) -> bool:

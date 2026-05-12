@@ -7,6 +7,36 @@ export interface CoachReport {
   improvements: string
   moments: string
   goals: string
+  metrics: PostGameMetrics
+  timeline: TimelinePoint[]
+  keyMoments: string[]
+}
+
+export interface PostGameMetrics {
+  champion: string
+  position: string
+  durationMinutes: number
+  kills: number
+  deaths: number
+  assists: number
+  finalCs: number
+  csPerMinute: number
+  csVsAvgPct: number | null
+  avgGoldDiff: number
+  score: number
+  seedSaved: boolean
+  seedDocId: string | null
+  benchmarkSource: string
+}
+
+export interface TimelinePoint {
+  minute: number
+  cs: number
+  goldDiff: number
+  healthPercent: number
+  kills: number
+  deaths: number
+  assists: number
 }
 
 export interface PostGameState {

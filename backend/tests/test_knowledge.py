@@ -186,15 +186,15 @@ def test_infer_fed_enemy_all_zero_returns_none():
     assert result is None
 
 
-def test_knowledge_snippets_injected_into_summary(tmp_path):
-    """Verify that [KNOWLEDGE] block appears in the packet summary passed to get_advice."""
+def test_knowledge_snippets_passed_via_advice_request(tmp_path):
+    """Verify that knowledge snippets are passed to get_advice via advice_request, not injected into packet.summary."""
     snippets = load_champion_snippets(DATA_DIR)
     collection = build_collection(snippets, tmp_path)
 
-    captured_packets = []
+    captured_kwargs = []
 
     async def fake_get_advice(packet, **kwargs):
-        captured_packets.append(packet)
+        captured_kwargs.append(kwargs)
         return "test advice"
 
     fake_state = get_fake_game_state()
@@ -208,5 +208,8 @@ def test_knowledge_snippets_injected_into_summary(tmp_path):
             ws.send_json({"action": "advice"})
             ws.receive_json()  # advice response
 
-    assert len(captured_packets) == 1
-    assert "[KNOWLEDGE]" in captured_packets[0].summary
+    assert len(captured_kwargs) == 1
+    advice_request = captured_kwargs[0].get("advice_request")
+    assert advice_request is not None
+    assert len(advice_request.knowledge_snippets) > 0
+    assert "[KNOWLEDGE]" not in captured_kwargs[0].get("advice_request", "").__class__.__name__  # summary not polluted
