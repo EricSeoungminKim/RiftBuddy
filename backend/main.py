@@ -30,7 +30,7 @@ from backend.context.question_planner import build_planned_question
 from backend.llm.advisor import get_advice
 from backend.advice.planner import plan
 from backend.riot.live_client import fetch_game_state, GameState
-from backend.opgg.client import get_matchup_guide, get_champion_counters
+from backend.opgg.client import get_matchup_guide, get_champion_counters, infer_lane_opponent
 from backend.opgg.snippets import matchup_guide_to_snippet, counters_to_snippet
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,8 @@ _event_pipeline = EventDetectorPipeline(detectors=[
 _knowledge_collection = None
 _performance_collection = None
 _game_poll_task: asyncio.Task | None = None
+_cached_lane_opponent: str | None = None  # inferred once per game session
+_lane_opponent_cache_key: str = ""        # "champion:position:enemies" to detect new game
 
 
 def get_knowledge_collection():
@@ -82,6 +84,23 @@ def _game_state_to_ws_payload(state: GameState) -> dict:
     }
 
 
+async def _refresh_lane_opponent_cache(state: GameState) -> None:
+    """Infer lane opponent via OP.GG role_rate once per unique game lineup."""
+    global _cached_lane_opponent, _lane_opponent_cache_key
+    enemy_list = list(state.enemy_champions)
+    cache_key = f"{state.champion_name}:{state.assigned_position}:{','.join(sorted(enemy_list))}"
+    if cache_key == _lane_opponent_cache_key or not enemy_list:
+        return
+    _lane_opponent_cache_key = cache_key
+    try:
+        inferred = await infer_lane_opponent(enemy_list, state.assigned_position)
+        _cached_lane_opponent = inferred
+        logger.info("Lane opponent inferred: %s (position=%s)", inferred, state.assigned_position)
+    except Exception as exc:
+        logger.warning("Lane opponent inference failed: %s", exc)
+        _cached_lane_opponent = None
+
+
 async def _poll_game_state() -> None:
     while True:
         await asyncio.sleep(3)
@@ -91,7 +110,9 @@ async def _poll_game_state() -> None:
             logger.warning("Game state poll error: %s", exc)
             continue
         if state is None:
+            _lane_opponent_cache_key = ""  # reset on game end
             continue
+        asyncio.create_task(_refresh_lane_opponent_cache(state))
         payload = _game_state_to_ws_payload(state)
         for ws in list(active_websockets):
             try:
@@ -170,20 +191,27 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 async def _fetch_opgg_snippets(state: GameState) -> list:
+    # Prefer cached inference; fall back to live_client's position-based guess
+    opponent = _cached_lane_opponent or (
+        state.lane_opponent
+        if state.lane_opponent and state.lane_opponent != "Unknown"
+        else None
+    )
+
     tasks = []
-    has_opponent = bool(state.lane_opponent and state.lane_opponent != "Unknown")
-    if has_opponent:
-        tasks.append(get_matchup_guide(state.champion_name, state.lane_opponent, state.assigned_position))
+    if opponent:
+        tasks.append(get_matchup_guide(state.champion_name, opponent, state.assigned_position))
     tasks.append(get_champion_counters(state.champion_name, state.assigned_position))
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
+    from backend.knowledge.schemas import KnowledgeSnippet
     snippets: list[KnowledgeSnippet] = []
     idx = 0
-    if has_opponent:
+    if opponent:
         r = results[idx]; idx += 1
         if not isinstance(r, Exception) and r:
-            s = matchup_guide_to_snippet(r, state.champion_name, state.lane_opponent)
+            s = matchup_guide_to_snippet(r, state.champion_name, opponent)
             if s:
                 snippets.append(s)
     r = results[idx]
