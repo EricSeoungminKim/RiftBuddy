@@ -42,6 +42,7 @@ WebSocket → Electron Overlay (frontend/)
 ```
 
 **Key files:**
+
 - `backend/main.py` — FastAPI app, polling loop, WebSocket handler, `send_advice()`
 - `backend/opgg/client.py` — OP.GG MCP HTTP client (no API key needed)
 - `backend/opgg/snippets.py` — OP.GG response → KnowledgeSnippet converters
@@ -53,12 +54,14 @@ WebSocket → Electron Overlay (frontend/)
 - `frontend/src/types.ts` — ServerMessage union type
 
 **Hotkeys (in-game):**
+
 - `Cmd+Shift+B` — general game state advice
 - `Cmd+Shift+C` — OP.GG matchup stats only (`opgg_only=True`)
 - `Cmd+Shift+1` — item recommendation
 - `Cmd+Shift+2` — macro/objective advice
 
 **WebSocket message types from backend:**
+
 - `advice` — standard LLM advice response
 - `proactive_warning` — auto-triggered danger window warning (no user prompt)
 - `transcript` — STT transcript echo
@@ -67,6 +70,7 @@ WebSocket → Electron Overlay (frontend/)
 - `error` — error message
 
 **Environment variables required (`.env`):**
+
 ```
 ANTHROPIC_API_KEY=
 ELEVENLABS_API_KEY=
@@ -89,6 +93,7 @@ RIFTBUDDY_RESPONSE_LANGUAGE=ko
 **Problem:** `proactive_warning` WebSocket messages are displayed identically to regular `advice` messages in the overlay. Users can't tell it's an automatic pattern-based warning vs. a requested advice.
 
 **What to do:**
+
 - In `frontend/src/hooks/useWebSocket.ts`: add a `isProactive: boolean` field to `ChatMessage` interface and set it `true` when `msg.type === "proactive_warning"`
 - In `frontend/src/components/Overlay.tsx`: render proactive warning messages with a distinct style — amber/yellow color, `⚠️` prefix, and slightly different background. Regular advice stays white/default.
 - In `frontend/src/types.ts`: `ProactiveWarningMessage` already exists — no changes needed there.
@@ -102,6 +107,7 @@ RIFTBUDDY_RESPONSE_LANGUAGE=ko
 **Problem:** `backend/knowledge/performance_seeds.py` → `save_game_seed()` tries to read `avg_stats.cs_per_min` from the OP.GG `lol_get_champion_analysis` response to compute `cs_vs_avg_pct`. This field name is unverified — the actual OP.GG API may use a different key.
 
 **Current code in `save_game_seed()`:**
+
 ```python
 avg_cs_per_min = avg_data.get("cs_per_min")
 if avg_cs_per_min and summary.game_duration_minutes > 0:
@@ -110,6 +116,7 @@ if avg_cs_per_min and summary.game_duration_minutes > 0:
 ```
 
 **What to do:**
+
 1. In `backend/opgg/client.py` → `get_champion_analysis_for_comparison()`, update `desired_output_fields` to also request `data.summary.average_stats` broadly (remove field filtering or add more candidates):
    ```python
    "desired_output_fields": [
@@ -136,6 +143,7 @@ if avg_cs_per_min and summary.game_duration_minutes > 0:
 **Problem:** The overlay chat log is a plain text list. There's no visual hierarchy between proactive warnings, OP.GG matchup responses, and regular advice. The UI needs to communicate type and priority at a glance.
 
 **What to do:**
+
 - Read `frontend/src/components/Overlay.tsx` in full first to understand current layout
 - Add a `source` tag badge to each message: `"🤖 AI 코치"` for regular advice, `"⚠️ 패턴 경고"` for proactive warnings, `"📊 OP.GG"` for matchup responses
   - Matchup responses are sent when user presses `Cmd+Shift+C` (action = `"matchup"`) — the backend sends a regular `advice` type. To distinguish, the frontend can track the last action sent and tag the next advice message accordingly.
@@ -157,8 +165,10 @@ if avg_cs_per_min and summary.game_duration_minutes > 0:
 **Problem:** The draft assistant (champion select phase) detects the player's champion and opponent picks via LCU API, but this data is not passed to the in-game advice pipeline. When the game starts, `backend/main.py` re-reads champion info from the Riot Live Client API, which can be slow or inaccurate in the first few minutes.
 
 **What to do:**
+
 1. In `frontend/electron/main.ts`, when champ select ends and the game starts, send the draft result (my champion, position, lane opponent) to the backend via a new REST endpoint.
 2. Add `POST /game/draft-context` endpoint in `backend/main.py` (or a new `backend/draft/router.py` route):
+
    ```python
    class DraftContext(BaseModel):
        my_champion: str
@@ -173,6 +183,7 @@ if avg_cs_per_min and summary.game_duration_minutes > 0:
        _lane_opponent_cache_key = f"{ctx.my_champion}:{ctx.my_position}:from_draft"
        return {"ok": True}
    ```
+
 3. In `frontend/electron/champSelectTracking.ts`, find where champ select finalization is detected and trigger the endpoint call after game start is confirmed.
 
 **Files to change:** `backend/main.py`, `frontend/electron/champSelectTracking.ts`, possibly `frontend/electron/main.ts`
@@ -183,7 +194,24 @@ if avg_cs_per_min and summary.game_duration_minutes > 0:
 
 **Goal:** Make RiftBuddy presentable as a portfolio project. Produce a polished README and a working demo script.
 
-**Spec (from `docs/superpowers/specs/2026-05-11-riftbuddy-2-0-design.md`):**
+#### What's fully implemented (as of this handoff)
+
+| Feature | Module |
+| --- | --- |
+| Live game state polling (3s) | `backend/riot/live_client.py`, `backend/main.py` |
+| 9 event detectors | `backend/timeline/detectors/` |
+| OP.GG MCP live matchup + fed-enemy snippets | `backend/opgg/client.py`, `backend/opgg/snippets.py` |
+| Lane opponent inference via role_rate | `backend/opgg/client.py` → `infer_lane_opponent()` |
+| ChromaDB RAG (champion knowledge + performance seeds) | `backend/knowledge/` |
+| Advice planning layer | `backend/advice/planner.py` |
+| Multi-provider LLM (Anthropic / Groq / Gemini / mock) | `backend/llm/advisor.py` |
+| Proactive pattern-based warnings (auto-push) | `backend/timeline/proactive_coach.py` |
+| After-game seed with OP.GG op_score + timeline trend | `backend/knowledge/performance_seeds.py` |
+| Draft assistant (champion select phase) | `frontend/src/draft/`, `backend/draft/` |
+| Post-game coaching report | `backend/postgame/router.py` |
+| Hotkeys: B / C / 1 / 2 | `frontend/electron/main.ts` |
+| Eval suite (6 scenarios) | `evals/run_evals.py` |
+| 107 backend tests | `backend/tests/` |
 
 #### 5a — README.md
 
@@ -192,37 +220,62 @@ Write `README.md` at repo root with this structure:
 ```markdown
 # RiftBuddy — Real-time AI Inference Platform for League Coaching
 
-[Demo GIF — placeholder OK if no recording yet]
+[Demo GIF — record with TEST_MODE=1]
 
 ## What it does
-## Architecture  (Mermaid diagram)
+## Architecture  ← Mermaid diagram (see below)
 ## Key Technical Challenges
-## Evaluation Results  (table from evals/run_evals.py output)
+## Evaluation Results  ← run evals/run_evals.py, paste table
 ## Quick Start
+## Hotkeys
 ## Environment Variables
+## Resume
 ```
 
-**Architecture diagram** should show the full pipeline:
-`Riot API → GameState → EventPipeline → OP.GG MCP → ChromaDB RAG → AdvicePlanner → LLM → WebSocket → Electron`
+**Architecture Mermaid diagram** to include:
 
-**Evaluation results table** — run `python evals/run_evals.py` and capture output, paste into README.
+```text
+Riot Live Client API
+  → GameState
+  → ContextPacket
+  → EventDetectorPipeline (9 detectors)
+  → OP.GG MCP (role_rate inference + matchup snippets)
+  → ChromaDB RAG (champion knowledge + performance seeds)
+  → AdvicePlanner
+  → LLM Gateway (Anthropic / Groq / Gemini)
+  → WebSocket
+  → Electron Overlay
+        ↑
+  ProactiveCoach (pattern warnings, no user prompt)
+```
+
+**Evaluation results** — run `python evals/run_evals.py` and paste the output table into README.
 
 #### 5b — Demo script (`TEST_MODE=1`)
 
-`TEST_MODE` is already supported in `backend/riot/live_client.py`. Verify the demo flow works end-to-end:
+`RIFTBUDDY_TEST_MODE=1` is already supported in `backend/riot/live_client.py` — returns a hardcoded `GameState` with realistic values (no real LoL game needed).
 
-1. `RIFTBUDDY_TEST_MODE=1 uvicorn backend.main:app --port 8001`
-2. Open Electron overlay
-3. Press `Cmd+Shift+B` → should receive general advice (mock game state)
-4. Verify `proactive_warning` appears if ChromaDB has seeded death pattern data
+Verify this end-to-end demo flow works:
 
-Add a `docs/DEMO.md` with step-by-step demo instructions for anyone evaluating the project.
+1. `RIFTBUDDY_TEST_MODE=1 LLM_PROVIDER=mock uvicorn backend.main:app --reload --port 8001`
+2. Open Electron overlay (`cd frontend && npm run dev`)
+3. `Cmd+Shift+B` → general advice (mock game state, mock LLM)
+4. `Cmd+Shift+C` → OP.GG matchup response
+5. `Cmd+Shift+1` → item recommendation
+6. `Cmd+Shift+2` → macro advice
+7. Wait for proactive warning if `.chroma_db/` has seeded death pattern data
+
+Create `docs/DEMO.md` with step-by-step instructions for anyone evaluating the project.
 
 #### 5c — Resume bullets
 
-Add to README under a collapsible `## Resume` section:
+Add to README under a collapsible `<details><summary>Resume</summary>` section:
 
-> Designed a real-time AI inference platform for League of Legends that transforms live game telemetry into prioritized coaching signals via a deterministic event detection pipeline (9 detectors), OP.GG MCP live data integration, champion/matchup knowledge retrieval (ChromaDB + sentence-transformers), and an advice planning layer before LLM dispatch. Includes proactive pattern-based coaching from historical performance seeds and an automated eval suite.
+**Standard:**
+> Built a real-time AI League coaching overlay with FastAPI, WebSockets, Electron, Riot Live Client API, and multi-provider LLM integration; added 9-detector event pipeline, OP.GG MCP live data integration, champion knowledge RAG, advice planning layer, proactive pattern-based coaching from historical seeds, and automated eval suite.
+
+**Strong:**
+> Designed a real-time AI inference platform for League of Legends that transforms live game telemetry into prioritized coaching signals via a deterministic event detection pipeline (9 detectors), OP.GG MCP live matchup data, champion/matchup knowledge retrieval (ChromaDB + sentence-transformers), and an advice planning layer before LLM dispatch. Includes proactive coaching that auto-triggers pattern-based warnings from historical performance seeds without user prompting.
 
 **Files to create/change:** `README.md`, `docs/DEMO.md`
 
