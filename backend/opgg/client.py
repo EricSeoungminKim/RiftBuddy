@@ -111,6 +111,51 @@ async def infer_lane_opponent(
     return best_champ
 
 
+async def get_last_match(
+    game_name: str,
+    tag_line: str,
+    region: str = "KR",
+    lang: str = "ko_KR",
+) -> dict | None:
+    """Fetch the most recent ranked match for a summoner."""
+    data = await _call("lol_list_summoner_matches", {
+        "game_name": game_name,
+        "tag_line": tag_line,
+        "region": region,
+        "lang": lang,
+        "limit": 1,
+        "desired_output_fields": [
+            "data.game_history[].{id,created_at,game_length_second,game_type}",
+            "data.game_history[].average_tier_info.{tier,division}",
+            "data.game_history[].participants[].{champion_name,position,team_key}",
+            "data.game_history[].participants[].summoner.{game_name,tagline}",
+            "data.game_history[].participants[].stats.{op_score,op_score_rank,result,kill,death,assist,minion_kill,total_damage_dealt_to_champions,vision_wards_bought_in_game}",
+            "data.game_history[].participants[].stats.op_score_timeline[]",
+            "data.game_history[].participants[].items_names[]",
+        ],
+    })
+    if not data:
+        return None
+    history = data.get("data", {}).get("game_history", [])
+    return history[0] if history else None
+
+
+async def get_champion_analysis_for_comparison(
+    champion: str,
+    position: str,
+) -> dict | None:
+    """Fetch Diamond-tier average stats for performance comparison."""
+    return await _call("lol_get_champion_analysis", {
+        "game_mode": "ranked",
+        "champion": _to_opgg_name(champion),
+        "position": _to_opgg_position(position),
+        "desired_output_fields": [
+            "data.summary.average_stats.{win_rate,kda,pick_rate}",
+            "data.summary.positions[].stats.{win_rate,kda}",
+        ],
+    })
+
+
 async def get_matchup_guide(
     my_champion: str,
     opponent_champion: str,

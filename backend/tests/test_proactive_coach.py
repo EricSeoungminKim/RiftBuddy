@@ -1,5 +1,6 @@
-"""Unit tests for proactive_coach — pattern extraction, clustering, and triggers."""
+"""Unit tests for proactive_coach and score trend analysis."""
 import pytest
+from backend.knowledge.performance_seeds import analyze_score_trend
 from backend.timeline.proactive_coach import (
     extract_death_minutes,
     cluster_danger_windows,
@@ -62,6 +63,27 @@ def test_trigger_not_after_window():
     # trigger window is [9.0, 9.5] min = [540, 570]s — 600s is past it
     fired = check_triggers(game_time_seconds=600, windows=windows)
     assert fired == []
+
+
+def test_analyze_score_trend_strong_early():
+    # High early, low late
+    timeline = [8.0, 8.5, 8.0, 7.0, 6.0, 5.5, 5.0, 4.5, 4.0]
+    assert analyze_score_trend(timeline) == "strong_early"
+
+def test_analyze_score_trend_strong_late():
+    # Low early, high late
+    timeline = [4.0, 4.5, 5.0, 6.0, 7.0, 7.5, 8.0, 8.5, 9.0]
+    assert analyze_score_trend(timeline) == "strong_late"
+
+def test_analyze_score_trend_consistent():
+    timeline = [6.0, 6.1, 6.2, 5.9, 6.0, 6.1, 6.2, 5.8, 6.0]
+    assert analyze_score_trend(timeline) == "consistent"
+
+def test_analyze_score_trend_too_short():
+    assert analyze_score_trend([6.0, 6.5]) is None
+
+def test_analyze_score_trend_empty():
+    assert analyze_score_trend([]) is None
 
 
 def test_trigger_fires_only_once():

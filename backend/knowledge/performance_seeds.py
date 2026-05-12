@@ -45,6 +45,7 @@ class GameSummary:
     items: list[str] = field(default_factory=list)
     avg_tier: str | None = None            # e.g. "GOLD", "PLATINUM"
     cs_vs_avg_pct: float | None = None     # e.g. 1.15 = 15% above avg
+    score_trend: str | None = None         # "strong_early", "strong_late", "peaked_mid", "consistent", "declined"
 
 
 # ---------------------------------------------------------------------------
@@ -116,7 +117,50 @@ def summarize_session(session: "GameSession") -> GameSummary | None:
 
 
 # ---------------------------------------------------------------------------
-# 2. generate_seed_text
+# 2. op_score_timeline analysis
+# ---------------------------------------------------------------------------
+
+def analyze_score_trend(timeline: list[float]) -> str | None:
+    """Classify performance arc from op_score_timeline (list of scores over time).
+
+    Splits the timeline into thirds and compares early vs late average.
+    Returns a trend label used in seed text and proactive coach hints.
+    """
+    if not timeline or len(timeline) < 6:
+        return None
+
+    third = len(timeline) // 3
+    early = sum(timeline[:third]) / third
+    mid = sum(timeline[third: third * 2]) / third
+    late = sum(timeline[third * 2:]) / (len(timeline) - third * 2)
+
+    diff_early_late = late - early
+    peak = max(early, mid, late)
+
+    if abs(diff_early_late) < 0.5:
+        return "consistent"
+    if diff_early_late >= 1.5:
+        return "strong_late"
+    if diff_early_late <= -1.5:
+        return "strong_early"
+    if peak == mid and early < mid and late < mid:
+        return "peaked_mid"
+    if diff_early_late < 0:
+        return "declined"
+    return "consistent"
+
+
+_TREND_LABELS = {
+    "strong_early": "초반 강세 → 후반 퍼포먼스 하락 패턴",
+    "strong_late": "후반 강세 → 스노우볼 성장 패턴",
+    "peaked_mid": "중반 피크 → 후반 마무리 약한 패턴",
+    "consistent": "전 구간 안정적인 퍼포먼스",
+    "declined": "후반으로 갈수록 퍼포먼스 저하",
+}
+
+
+# ---------------------------------------------------------------------------
+# 3. generate_seed_text
 # ---------------------------------------------------------------------------
 
 def generate_seed_text(summary: GameSummary) -> str:
@@ -153,7 +197,10 @@ def generate_seed_text(summary: GameSummary) -> str:
     if summary.items:
         base += f" Final build: {', '.join(summary.items)}."
 
-    # C: score trend / grade
+    # C: score trend
+    if summary.score_trend:
+        label = _TREND_LABELS.get(summary.score_trend, summary.score_trend)
+        base += f" 퍼포먼스 흐름: {label}."
     if summary.avg_tier:
         base += f" Match avg tier: {summary.avg_tier}."
 
@@ -167,7 +214,7 @@ def generate_seed_text(summary: GameSummary) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 3. embed_performance_seed
+# 4. embed_performance_seed
 # ---------------------------------------------------------------------------
 
 def embed_performance_seed(
@@ -201,7 +248,7 @@ def embed_performance_seed(
 
 
 # ---------------------------------------------------------------------------
-# 4. save_game_seed
+# 5. save_game_seed
 # ---------------------------------------------------------------------------
 
 def save_game_seed(
@@ -237,6 +284,9 @@ def save_game_seed(
             summary.op_score_rank = rank if rank in ("MVP", "ACE") else None
             summary.damage_dealt = stats.get("total_damage_dealt_to_champions")
             summary.items = own.get("items_names", [])
+            timeline = stats.get("op_score_timeline", [])
+            if isinstance(timeline, list):
+                summary.score_trend = analyze_score_trend([float(v) for v in timeline if v is not None])
         tier_info = opgg_match.get("average_tier_info", {})
         summary.avg_tier = tier_info.get("tier")
 
