@@ -12,7 +12,10 @@ from backend.lcu.router import router as lcu_router
 from backend.postgame.router import router as postgame_router
 from backend.postgame.router import game_session as _game_session
 from backend.config import CONFIG
-from backend.context.engine import build_context_packet, enrich_summary_with_events
+from pathlib import Path
+from backend.context.engine import build_context_packet, enrich_summary_with_events, ContextPacket
+from backend.knowledge.embedder import get_or_build_collection
+from backend.knowledge.retriever import retrieve
 from backend.timeline.event_detector import EventDetectorPipeline
 from backend.timeline.detectors.low_health import LowHealthDetector
 from backend.timeline.detectors.gold_spike import GoldSpikeDetector
@@ -43,6 +46,7 @@ _event_pipeline = EventDetectorPipeline(detectors=[
     VisionWarningDetector(),
     EnemyJungleUnknownDetector(),
 ])
+_knowledge_collection = None
 wake_word_task: asyncio.Task | None = None
 _game_poll_task: asyncio.Task | None = None
 
@@ -108,7 +112,11 @@ async def _poll_game_state() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    global _game_poll_task
+    global _game_poll_task, _knowledge_collection
+    _knowledge_collection = get_or_build_collection(
+        data_dir=Path("backend/knowledge/data"),
+        db_path=Path(".chroma_db"),
+    )
     await _start_wake_word_task()
     _game_poll_task = asyncio.create_task(_poll_game_state())
     try:
@@ -224,6 +232,26 @@ async def send_advice(websocket: WebSocket, user_query: str | None, language: st
     packet = build_context_packet(game_state)
     detected_events = _event_pipeline.run(game_state, packet)
     packet = enrich_summary_with_events(packet, detected_events)
+    knowledge_snippets = retrieve(
+        champion=game_state.champion_name,
+        lane_opponent=game_state.lane_opponent,
+        fed_enemy=game_state.fed_enemy,
+        collection=_knowledge_collection,
+    ) if _knowledge_collection is not None else []
+    if knowledge_snippets:
+        knowledge_block = "\n".join(
+            f"[KNOWLEDGE] {s.source}: {s.content}" for s in knowledge_snippets
+        )
+        packet = ContextPacket(
+            health_percent=packet.health_percent,
+            gold=packet.gold,
+            level=packet.level,
+            game_time_minutes=packet.game_time_minutes,
+            summary=f"{knowledge_block}\n\n{packet.summary}",
+            champion_name=packet.champion_name,
+            assigned_position=packet.assigned_position,
+            creep_score=packet.creep_score,
+        )
     advice = await get_advice(packet, user_query=user_query, language=language)
     audio_bytes = None
     audio_error = None

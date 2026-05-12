@@ -1,13 +1,19 @@
 import tempfile
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import chromadb
 import pytest
+from fastapi.testclient import TestClient
 
 from backend.knowledge.embedder import build_collection, get_or_build_collection
 from backend.knowledge.loader import load_champion_snippets
 from backend.knowledge.retriever import retrieve
 from backend.knowledge.schemas import KnowledgeSnippet
+from backend.riot.live_client import (
+    GameState, get_fake_game_state,
+    _infer_lane_opponent, _infer_fed_enemy,
+)
 
 DATA_DIR = Path("backend/knowledge/data")
 
@@ -119,12 +125,6 @@ def test_retrieve_with_fed_enemy():
     assert len(snippets) == 3
 
 
-from backend.riot.live_client import (
-    GameState, get_fake_game_state,
-    _infer_lane_opponent, _infer_fed_enemy,
-)
-
-
 def test_fake_game_state_has_lane_opponent():
     state = get_fake_game_state()
     assert state.lane_opponent is not None
@@ -184,3 +184,30 @@ def test_infer_fed_enemy_all_zero_returns_none():
     active_player = {"team": "ORDER"}
     result = _infer_fed_enemy(data, active_player)
     assert result is None
+
+
+def test_knowledge_snippets_injected_into_summary(tmp_path):
+    """Verify that [KNOWLEDGE] block appears in the packet summary passed to get_advice."""
+    snippets = load_champion_snippets(DATA_DIR)
+    collection = build_collection(snippets, tmp_path)
+
+    captured_packets = []
+
+    async def fake_get_advice(packet, **kwargs):
+        captured_packets.append(packet)
+        return "test advice"
+
+    fake_state = get_fake_game_state()
+
+    with patch("backend.main._knowledge_collection", collection), \
+         patch("backend.main.fetch_game_state", AsyncMock(return_value=fake_state)), \
+         patch("backend.main.get_advice", fake_get_advice), \
+         patch("backend.main.text_to_speech_bytes", AsyncMock(return_value=b"")):
+        from backend.main import app
+        client = TestClient(app)
+        with client.websocket_connect("/ws") as ws:
+            ws.send_json({"action": "advice"})
+            ws.receive_json()  # advice response
+
+    assert len(captured_packets) == 1
+    assert "[KNOWLEDGE]" in captured_packets[0].summary
