@@ -203,11 +203,21 @@ app.whenReady().then(() => {
   startLeagueTracking(overlayWin);
   startChampSelectTracking();
 
+  // Cmd+Shift+B — 현재 게임 상황 기반 조언 (이벤트 + RAG)
   globalShortcut.register("CommandOrControl+Shift+B", () => {
     overlayWin?.webContents.send("riftbuddy:request-advice");
   });
-  globalShortcut.register("CommandOrControl+Shift+Space", () => {
-    overlayWin?.webContents.send("riftbuddy:request-voice-question");
+  // Cmd+Shift+C — 상대 챔피언 매치업 + OP.GG 통계
+  globalShortcut.register("CommandOrControl+Shift+C", () => {
+    overlayWin?.webContents.send("riftbuddy:request-matchup");
+  });
+  // Cmd+Shift+1 — 아이템 추천
+  globalShortcut.register("CommandOrControl+Shift+1", () => {
+    overlayWin?.webContents.send("riftbuddy:request-items");
+  });
+  // Cmd+Shift+2 — 매크로 / 오브젝트 타이밍
+  globalShortcut.register("CommandOrControl+Shift+2", () => {
+    overlayWin?.webContents.send("riftbuddy:request-macro");
   });
   globalShortcut.register("CommandOrControl+Shift+L", () => {
     overlayWin?.webContents.send("riftbuddy:toggle-language");

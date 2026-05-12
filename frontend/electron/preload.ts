@@ -7,6 +7,21 @@ contextBridge.exposeInMainWorld("riftBuddy", {
     return () =>
       ipcRenderer.removeListener("riftbuddy:request-advice", handler);
   },
+  onRequestMatchup: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on("riftbuddy:request-matchup", handler);
+    return () => ipcRenderer.removeListener("riftbuddy:request-matchup", handler);
+  },
+  onRequestItems: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on("riftbuddy:request-items", handler);
+    return () => ipcRenderer.removeListener("riftbuddy:request-items", handler);
+  },
+  onRequestMacro: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on("riftbuddy:request-macro", handler);
+    return () => ipcRenderer.removeListener("riftbuddy:request-macro", handler);
+  },
   onRequestVoiceQuestion: (callback: () => void) => {
     const handler = () => callback();
     ipcRenderer.on("riftbuddy:request-voice-question", handler);

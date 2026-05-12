@@ -89,7 +89,25 @@ export function useWebSocket() {
 
   const requestPlannedAdvice = useCallback((language = "ko") => {
     if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({ mode: "planned", query: null, language }));
+      ws.current.send(JSON.stringify({ action: "advice", mode: "planned", query: null, language }));
+    }
+  }, []);
+
+  const requestMatchup = useCallback((language = "ko") => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ action: "matchup", query: null, language }));
+    }
+  }, []);
+
+  const requestItems = useCallback((language = "ko") => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ action: "items", query: null, language }));
+    }
+  }, []);
+
+  const requestMacro = useCallback((language = "ko") => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ action: "macro", query: null, language }));
     }
   }, []);
 
@@ -102,6 +120,9 @@ export function useWebSocket() {
     sendQuery,
     requestVoiceQuestion,
     requestPlannedAdvice,
+    requestMatchup,
+    requestItems,
+    requestMacro,
     wsUrl: WS_URL
   };
 }

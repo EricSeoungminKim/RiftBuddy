@@ -57,6 +57,9 @@ def load_config(require_env: bool = True) -> dict[str, str]:
         "supabase_url": os.getenv("SUPABASE_URL", ""),
         "supabase_anon_key": os.getenv("SUPABASE_ANON_KEY", ""),
         "riot_api_key": os.getenv("RIOT_API_KEY", ""),
+        "riot_game_name": os.getenv("RIOT_GAME_NAME", ""),
+        "riot_tag_line": os.getenv("RIOT_TAG_LINE", ""),
+        "riot_region": os.getenv("RIOT_REGION", "KR"),
         "test_mode": os.getenv("RIFTBUDDY_TEST_MODE", "0"),
         "bypass_auth": os.getenv("RIFTBUDDY_BYPASS_AUTH", "0"),
     }

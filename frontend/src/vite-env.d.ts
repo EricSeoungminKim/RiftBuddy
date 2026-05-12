@@ -3,6 +3,9 @@
 interface Window {
   riftBuddy?: {
     onRequestAdvice: (callback: () => void) => () => void;
+    onRequestMatchup: (callback: () => void) => () => void;
+    onRequestItems: (callback: () => void) => () => void;
+    onRequestMacro: (callback: () => void) => () => void;
     onRequestVoiceQuestion: (callback: () => void) => () => void;
     onToggleLanguage: (callback: () => void) => () => void;
     onTabSwitch?: (callback: (tabIndex: number) => void) => () => void;

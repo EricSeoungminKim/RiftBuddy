@@ -155,7 +155,14 @@ async def websocket_endpoint(websocket: WebSocket):
             mode = msg.get("mode")
             language = msg.get("language") or CONFIG["response_language"]
 
-            await send_advice(websocket, user_query=user_query, language=language, planned=mode == "planned")
+            if action == "matchup":
+                await send_advice(websocket, user_query="상대 챔피언 매치업과 OP.GG 통계를 알려줘.", language=language, planned=False, opgg_only=True)
+            elif action == "items":
+                await send_advice(websocket, user_query="지금 뭘 사야 해? 아이템 추천해줘.", language=language, planned=False)
+            elif action == "macro":
+                await send_advice(websocket, user_query="오브젝트 타이밍과 지금 매크로 플레이를 알려줘.", language=language, planned=False)
+            else:
+                await send_advice(websocket, user_query=user_query, language=language, planned=mode == "planned")
     except WebSocketDisconnect:
         pass
     finally:
@@ -187,7 +194,7 @@ async def _fetch_opgg_snippets(state: GameState) -> list:
     return snippets
 
 
-async def send_advice(websocket: WebSocket, user_query: str | None, language: str, planned: bool = False) -> None:
+async def send_advice(websocket: WebSocket, user_query: str | None, language: str, planned: bool = False, opgg_only: bool = False) -> None:
     game_state = await fetch_game_state()
     if game_state is None:
         await websocket.send_json({"type": "error", "message": "Game not running"})
@@ -209,16 +216,19 @@ async def send_advice(websocket: WebSocket, user_query: str | None, language: st
     packet = build_context_packet(game_state)
     detected_events = _event_pipeline.run(game_state, packet)
     packet = enrich_summary_with_events(packet, detected_events)
-    knowledge_snippets = retrieve(
-        champion=game_state.champion_name,
-        lane_opponent=game_state.lane_opponent,
-        fed_enemy=game_state.fed_enemy,
-        collection=_knowledge_collection,
-        performance_collection=_performance_collection,
-    ) if _knowledge_collection is not None else []
-
     opgg_snippets = await _fetch_opgg_snippets(game_state)
-    knowledge_snippets = opgg_snippets + knowledge_snippets
+
+    if opgg_only:
+        knowledge_snippets = opgg_snippets
+    else:
+        rag_snippets = retrieve(
+            champion=game_state.champion_name,
+            lane_opponent=game_state.lane_opponent,
+            fed_enemy=game_state.fed_enemy,
+            collection=_knowledge_collection,
+            performance_collection=_performance_collection,
+        ) if _knowledge_collection is not None else []
+        knowledge_snippets = opgg_snippets + rag_snippets
 
     advice_request = plan(detected_events, knowledge_snippets)
     advice = await get_advice(packet, user_query=user_query, language=language, advice_request=advice_request)

@@ -5,7 +5,7 @@ import { StatusBar } from "./StatusBar";
 import { TabBar } from "./overlay/TabBar";
 
 export function Overlay() {
-  const { lastError, isConnected, audioQueue, messages, requestVoiceQuestion, requestPlannedAdvice } = useWebSocket();
+  const { lastError, isConnected, audioQueue, messages, requestVoiceQuestion, requestPlannedAdvice, requestMatchup, requestItems, requestMacro } = useWebSocket();
   const [language, setLanguage] = useState((import.meta.env.VITE_RIFTBUDDY_RESPONSE_LANGUAGE as string) ?? "ko");
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -22,14 +22,12 @@ export function Overlay() {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const modifierPressed = event.metaKey || event.ctrlKey;
-      if (modifierPressed && event.shiftKey && event.key.toLowerCase() === "b") {
-        event.preventDefault();
-        requestPlannedAdvice(language);
-      }
-      if (modifierPressed && event.shiftKey && event.code === "Space") {
-        event.preventDefault();
-        requestVoiceQuestion(language);
-      }
+      if (!modifierPressed || !event.shiftKey) return;
+      const key = event.key.toLowerCase();
+      if (key === "b") { event.preventDefault(); requestPlannedAdvice(language); }
+      else if (key === "c") { event.preventDefault(); requestMatchup(language); }
+      else if (key === "1") { event.preventDefault(); requestItems(language); }
+      else if (key === "2") { event.preventDefault(); requestMacro(language); }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -38,6 +36,18 @@ export function Overlay() {
   useEffect(() => {
     return window.riftBuddy?.onRequestAdvice(() => requestPlannedAdvice(language));
   }, [language, requestPlannedAdvice]);
+
+  useEffect(() => {
+    return window.riftBuddy?.onRequestMatchup(() => requestMatchup(language));
+  }, [language, requestMatchup]);
+
+  useEffect(() => {
+    return window.riftBuddy?.onRequestItems(() => requestItems(language));
+  }, [language, requestItems]);
+
+  useEffect(() => {
+    return window.riftBuddy?.onRequestMacro(() => requestMacro(language));
+  }, [language, requestMacro]);
 
   useEffect(() => {
     return window.riftBuddy?.onRequestVoiceQuestion(() => requestVoiceQuestion(language));
