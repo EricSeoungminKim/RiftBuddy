@@ -28,6 +28,7 @@ from backend.timeline.detectors.vision_warning import VisionWarningDetector
 from backend.timeline.detectors.enemy_jungle_unknown import EnemyJungleUnknownDetector
 from backend.context.question_planner import build_planned_question
 from backend.llm.advisor import get_advice
+from backend.advice.planner import plan
 from backend.riot.live_client import fetch_game_state, GameState
 
 logger = logging.getLogger(__name__)
@@ -188,21 +189,8 @@ async def send_advice(websocket: WebSocket, user_query: str | None, language: st
         collection=_knowledge_collection,
         performance_collection=_performance_collection,
     ) if _knowledge_collection is not None else []
-    if knowledge_snippets:
-        knowledge_block = "\n".join(
-            f"[KNOWLEDGE] {s.source}: {s.content}" for s in knowledge_snippets
-        )
-        packet = ContextPacket(
-            health_percent=packet.health_percent,
-            gold=packet.gold,
-            level=packet.level,
-            game_time_minutes=packet.game_time_minutes,
-            summary=f"{knowledge_block}\n\n{packet.summary}",
-            champion_name=packet.champion_name,
-            assigned_position=packet.assigned_position,
-            creep_score=packet.creep_score,
-        )
-    advice = await get_advice(packet, user_query=user_query, language=language)
+    advice_request = plan(detected_events, knowledge_snippets)
+    advice = await get_advice(packet, user_query=user_query, language=language, advice_request=advice_request)
     await websocket.send_json(
         {
             "type": "advice",

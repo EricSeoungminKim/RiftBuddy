@@ -34,6 +34,9 @@ class GameSummary:
     avg_cs: float
     avg_gold_diff: float
     game_duration_minutes: float
+    lane_opponent: str | None = None
+    ally_champions: tuple[str, ...] = field(default_factory=tuple)
+    enemy_champions: tuple[str, ...] = field(default_factory=tuple)
     key_moments: list[str] = field(default_factory=list)
 
 
@@ -84,6 +87,12 @@ def summarize_session(session: "GameSession") -> GameSummary | None:
             f"Gold peak: +{int(peak_snap.gold_diff)} at {_ts(peak_snap.game_time)}"
         )
 
+    # Team composition — taken from the last snapshot (stable throughout game)
+    first = snaps[0]
+    ally_champions = first.ally_champions
+    enemy_champions = first.enemy_champions
+    lane_opponent = first.lane_opponent
+
     return GameSummary(
         champion=last.champion_name,
         kills=kills,
@@ -92,6 +101,9 @@ def summarize_session(session: "GameSession") -> GameSummary | None:
         avg_cs=avg_cs,
         avg_gold_diff=avg_gold_diff,
         game_duration_minutes=duration_minutes,
+        lane_opponent=lane_opponent,
+        ally_champions=ally_champions,
+        enemy_champions=enemy_champions,
         key_moments=key_moments,
     )
 
@@ -107,6 +119,17 @@ def generate_seed_text(summary: GameSummary) -> str:
         f"Personal history - {summary.champion}: {kda} KDA, "
         f"avg {int(summary.avg_cs)} CS, avg {gold_str} gold lead ({int(summary.game_duration_minutes)}min game)."
     )
+
+    # Lane matchup result
+    if summary.lane_opponent:
+        lane_result = "won lane" if summary.avg_gold_diff >= 0 else "lost lane"
+        base += f" vs {summary.lane_opponent} ({lane_result})."
+
+    # Team compositions
+    if summary.ally_champions:
+        base += f" Ally comp: {', '.join(summary.ally_champions)}."
+    if summary.enemy_champions:
+        base += f" Enemy comp: {', '.join(summary.enemy_champions)}."
 
     if not summary.key_moments:
         return base
@@ -139,6 +162,9 @@ def embed_performance_seed(
             "avg_cs": summary.avg_cs,
             "avg_gold_diff": summary.avg_gold_diff,
             "game_duration_minutes": summary.game_duration_minutes,
+            "lane_opponent": summary.lane_opponent or "",
+            "ally_comp": ", ".join(summary.ally_champions),
+            "enemy_comp": ", ".join(summary.enemy_champions),
             "source": "performance",
             "date": now.strftime("%Y-%m-%d"),
         }],
