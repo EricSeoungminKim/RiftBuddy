@@ -25,8 +25,14 @@ export interface ListeningMessage {
   text: string;
 }
 
+export interface ProactiveWarningMessage {
+  type: "proactive_warning";
+  text: string;
+}
+
 export type ServerMessage =
   | AdviceMessage
   | ErrorMessage
   | TranscriptMessage
-  | ListeningMessage;
+  | ListeningMessage
+  | ProactiveWarningMessage;

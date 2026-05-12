@@ -47,6 +47,9 @@ export function useWebSocket() {
             setLastAdvice(msg.text);
             setLastError(msg.audio_error ?? null);
             setMessages((items) => [...items.slice(-(MAX_MESSAGES - 1)), { role: "buddy", text: msg.text }]);
+          } else if (msg.type === "proactive_warning") {
+            setLastAdvice(msg.text);
+            setMessages((items) => [...items.slice(-(MAX_MESSAGES - 1)), { role: "buddy", text: msg.text }]);
           } else if (msg.type === "transcript") {
             setMessages((items) => [...items.slice(-(MAX_MESSAGES - 1)), { role: "user", text: msg.text }]);
           } else if (msg.type === "listening") {

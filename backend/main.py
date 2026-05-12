@@ -32,6 +32,7 @@ from backend.advice.planner import plan
 from backend.riot.live_client import fetch_game_state, GameState
 from backend.opgg.client import get_matchup_guide, get_champion_counters, infer_lane_opponent
 from backend.opgg.snippets import matchup_guide_to_snippet, fed_enemy_to_snippet
+from backend.timeline.proactive_coach import ProactiveCoachSession, generate_proactive_warning
 
 logger = logging.getLogger(__name__)
 active_websockets: set[WebSocket] = set()
@@ -51,6 +52,8 @@ _performance_collection = None
 _game_poll_task: asyncio.Task | None = None
 _cached_lane_opponent: str | None = None  # inferred once per game session
 _lane_opponent_cache_key: str = ""        # "champion:position:enemies" to detect new game
+_proactive_session: ProactiveCoachSession | None = None
+_proactive_session_key: str = ""          # "champion:position" to detect new game
 
 
 def get_knowledge_collection():
@@ -101,6 +104,54 @@ async def _refresh_lane_opponent_cache(state: GameState) -> None:
         _cached_lane_opponent = None
 
 
+async def _ensure_proactive_session(state: GameState) -> None:
+    """Load danger windows from past seeds once per champion+position combo."""
+    global _proactive_session, _proactive_session_key
+    key = f"{state.champion_name}:{state.assigned_position}"
+    if key == _proactive_session_key:
+        return
+    _proactive_session_key = key
+    session = ProactiveCoachSession(
+        champion=state.champion_name,
+        position=state.assigned_position,
+    )
+    if _performance_collection is not None:
+        try:
+            await session.load(_performance_collection)
+            logger.info(
+                "Proactive coach loaded %d danger windows for %s",
+                len(session.windows),
+                state.champion_name,
+            )
+        except Exception as exc:
+            logger.warning("Proactive coach load failed: %s", exc)
+    _proactive_session = session
+
+
+async def _run_proactive_checks(state: GameState) -> None:
+    """Check if any danger window triggers and push warnings to all WebSocket clients."""
+    if _proactive_session is None or not _proactive_session.loaded:
+        return
+    fired = _proactive_session.check(state.game_time)
+    language = CONFIG.get("response_language", "ko")
+    for window in fired:
+        try:
+            warning_text = await generate_proactive_warning(
+                window,
+                champion=state.champion_name,
+                position=state.assigned_position,
+                language=language,
+            )
+            payload = {"type": "proactive_warning", "text": warning_text}
+            for ws in list(active_websockets):
+                try:
+                    await ws.send_json(payload)
+                except Exception:
+                    active_websockets.discard(ws)
+        except Exception as exc:
+            logger.warning("Proactive warning generation failed: %s", exc)
+
+
 async def _poll_game_state() -> None:
     while True:
         await asyncio.sleep(3)
@@ -111,8 +162,11 @@ async def _poll_game_state() -> None:
             continue
         if state is None:
             _lane_opponent_cache_key = ""  # reset on game end
+            _proactive_session_key = ""
             continue
         asyncio.create_task(_refresh_lane_opponent_cache(state))
+        asyncio.create_task(_ensure_proactive_session(state))
+        asyncio.create_task(_run_proactive_checks(state))
         payload = _game_state_to_ws_payload(state)
         for ws in list(active_websockets):
             try:
