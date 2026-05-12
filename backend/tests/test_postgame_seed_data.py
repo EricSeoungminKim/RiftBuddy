@@ -35,6 +35,7 @@ async def test_fetch_postgame_seed_data_prefers_riot_cs_benchmark():
     with patch.dict(
         "backend.postgame.router.CONFIG",
         {
+            "test_mode": "0",
             "riot_api_key": "riot-key",
             "riot_region": "KR",
             "riot_game_name": "tester",

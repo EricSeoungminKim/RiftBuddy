@@ -143,31 +143,59 @@ def build_structured_prompt(request: "AdviceRequest", language: str) -> str:
 
 
 def get_mock_advice(packet: ContextPacket, user_query: Optional[str], language: str = "en", advice_request: "AdviceRequest | None" = None) -> str:
-    if language == "ko":
-        if packet.health_percent < 30:
-            return f"체력이 {packet.health_percent:g}%라 위험해. 싸움 피하고 안전하게 귀환각을 먼저 봐."
-        if packet.gold >= 2500:
-            return f"{packet.gold:g}골드가 있으니 다음 웨이브만 안전하게 정리하고 귀환해서 아이템으로 바꿔."
-        return f"현재 {packet.champion_name} 레벨 {packet.level}, CS {packet.creep_score}야. 시야 잡고 무리한 교전은 피하면서 다음 스파이크를 봐."
+    mode = (advice_request.mode if advice_request else None) or ""
+    is_opgg = user_query and "OP.GG" in user_query
+    champ = packet.champion_name
+    pos = packet.assigned_position
+    gold = packet.gold
+    lvl = packet.level
+    cs = packet.creep_score
+    hp = packet.health_percent
+    gold_diff = getattr(packet, "gold_diff", 0) or 0
 
-    if packet.health_percent < 30:
+    if language == "ko":
+        if is_opgg:
+            return (
+                f"[OP.GG 매치업] {champ}의 현재 포지션은 {pos}야. "
+                "라인 상대의 스킬 쿨타임 패턴을 파악하고, 상대가 스킬을 쓴 직후가 교전 타이밍이야. "
+                "OP.GG 승률 기준으로 포킹 후 올인 패턴이 유효해."
+            )
+        if mode == "RECALL":
+            return f"{gold:g}골드 들고 있어. 지금 웨이브 한 번만 정리하고 귀환해서 아이템 스파이크 만들어."
+        if mode == "DEFENSIVE" or hp < 30:
+            return f"체력 {hp:g}%라 위험해. 즉시 귀환각 보고 안전한 구역으로 빠져. 갱 위험 있으니 시야 확인 먼저."
+        if mode == "MACRO":
+            diff_txt = f"골드 {'+' if gold_diff >= 0 else ''}{gold_diff:g}" if gold_diff else ""
+            return (
+                f"레벨 {lvl}, CS {cs}, {diff_txt}. "
+                "바론/드래곤 타이머 확인하고 시야 먼저 깔아. 오브젝트 싸움 전에 웨이브 정리해서 이득 보장해."
+            )
+        # planned / default
         return (
-            "You are low health, so back off and look for a reset before forcing the next play. "
-            f"You have {packet.gold:g} gold at level {packet.level}, which is enough to turn into tempo."
+            f"{champ} 레벨 {lvl}, CS {cs}, 골드 {gold:g}. "
+            "다음 웨이브 우선 정리하고 상대 스킬 쿨타임 보면서 교전 타이밍 잡아."
         )
-    if user_query and "push" in user_query.lower():
+
+    # English
+    if is_opgg:
         return (
-            "You are healthy enough to pressure the wave. Push only if you know the enemy jungler's position; "
-            "otherwise hold the wave closer to safety."
+            f"[OP.GG Matchup] {champ} {pos}: trade after the opponent's key ability is on cooldown. "
+            "OP.GG data shows poke-to-all-in works best here — don't take extended trades early."
         )
-    if packet.gold >= 2500:
+    if mode == "RECALL":
+        return f"You have {gold:g} gold — finish this wave cleanly and recall now to convert that lead into an item spike."
+    if mode == "DEFENSIVE" or hp < 30:
+        return f"Health at {hp:g}%. Back off and deny pressure — don't fight without vision or jungler track. Reset when safe."
+    if mode == "MACRO":
+        diff_txt = f"gold diff {'+' if gold_diff >= 0 else ''}{gold_diff:g}" if gold_diff else ""
         return (
-            f"You are sitting on {packet.gold:g} gold, so plan a clean recall after the next safe wave. "
-            "Spend that lead before the next objective fight."
+            f"Level {lvl}, {cs} CS, {diff_txt}. "
+            "Check baron/dragon timer, set up vision before the fight, and crash the wave first to bank the tempo."
         )
+    # planned / default
     return (
-        f"You are {packet.health_percent:g}% HP at level {packet.level}. "
-        "Play for vision, farm safely, and avoid coin-flip fights until your next item spike."
+        f"{champ} level {lvl}, {cs} CS, {gold:g} gold. "
+        "Clear the next wave safely, then rotate or pressure based on objective timer."
     )
 
 

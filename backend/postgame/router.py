@@ -99,15 +99,38 @@ async def add_snapshot(payload: SnapshotPayload):
     return {"stored": len(game_session.snapshots)}
 
 
+def _stub_avg_stats(champion: str, position: str, cspm: float) -> dict:
+    """Deterministic Diamond benchmark used in mock/test mode so csVsAvgPct is always populated."""
+    diamond_cspm = round(cspm * 1.08, 2)  # player is ~8% below Diamond average
+    return {
+        "data": {
+            "summary": {
+                "average_stats": {
+                    "cs_per_min": diamond_cspm,
+                }
+            }
+        },
+        "samples": 25,
+        "source": "mock",
+        "champion": champion,
+        "position": position,
+    }
+
+
 async def _fetch_postgame_seed_data(session: GameSession) -> tuple[dict | None, dict | None, str]:
     """Fetch OP.GG match data and Riot/OP.GG average stats for seed enrichment."""
-    game_name = CONFIG.get("riot_game_name", "")
-    tag_line = CONFIG.get("riot_tag_line", "")
-    region = CONFIG.get("riot_region", "KR")
-
     snaps = session.snapshots
     champion = snaps[-1].champion_name if snaps else ""
     position = snaps[-1].assigned_position if snaps else ""
+
+    if CONFIG.get("test_mode", "0") == "1":
+        duration = max(snaps[-1].game_time / 60, 0.1) if snaps else 1.0
+        cspm = round((snaps[-1].creep_score if snaps else 72) / duration, 2)
+        return None, _stub_avg_stats(champion, position, cspm), "mock"
+
+    game_name = CONFIG.get("riot_game_name", "")
+    tag_line = CONFIG.get("riot_tag_line", "")
+    region = CONFIG.get("riot_region", "KR")
     riot_key = CONFIG.get("riot_api_key", "")
 
     async def _noop() -> None:
