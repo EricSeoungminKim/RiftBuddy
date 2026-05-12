@@ -1,5 +1,10 @@
+from __future__ import annotations
+
 import re
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from backend.advice.schemas import AdviceRequest
 
 import anthropic
 import httpx
@@ -127,7 +132,17 @@ def clean_response_language(text: str, language: str) -> str:
     return cleaned
 
 
-def get_mock_advice(packet: ContextPacket, user_query: Optional[str], language: str = "en") -> str:
+def build_structured_prompt(request: "AdviceRequest", language: str) -> str:
+    lines = [f"[MODE: {request.mode}]"]
+    if request.priority_event is not None:
+        e = request.priority_event
+        lines.append(f"[PRIORITY: {e.event_type} — {e.reason}]")
+    for snippet in request.knowledge_snippets:
+        lines.append(f"[KNOWLEDGE: {snippet.source}: {snippet.content}]")
+    return "\n".join(lines)
+
+
+def get_mock_advice(packet: ContextPacket, user_query: Optional[str], language: str = "en", advice_request: "AdviceRequest | None" = None) -> str:
     if language == "ko":
         if packet.health_percent < 30:
             return f"체력이 {packet.health_percent:g}%라 위험해. 싸움 피하고 안전하게 귀환각을 먼저 봐."
@@ -156,11 +171,19 @@ def get_mock_advice(packet: ContextPacket, user_query: Optional[str], language: 
     )
 
 
-def build_user_content(packet: ContextPacket, user_query: Optional[str], language: str = "en") -> str:
+def build_user_content(
+    packet: ContextPacket,
+    user_query: Optional[str],
+    language: str = "en",
+    advice_request: "AdviceRequest | None" = None,
+) -> str:
+    prefix = ""
+    if advice_request is not None:
+        prefix = build_structured_prompt(advice_request, language) + "\n\n"
     role_line = ""
     if packet.champion_name != "Unknown" and packet.assigned_position != "UNKNOWN":
         role_line = f"Player role: {packet.champion_name} ({packet.assigned_position})\n"
-    user_content = (
+    user_content = prefix + (
         f"{role_line}Current game state:\n{packet.summary}"
         "\n\nCoaching requirements:"
         "\n- Use only League-specific reasoning."
@@ -178,8 +201,8 @@ def build_user_content(packet: ContextPacket, user_query: Optional[str], languag
     return user_content
 
 
-async def get_anthropic_advice(packet: ContextPacket, user_query: Optional[str], language: str = "en") -> str:
-    user_content = build_user_content(packet, user_query, language)
+async def get_anthropic_advice(packet: ContextPacket, user_query: Optional[str], language: str = "en", advice_request: "AdviceRequest | None" = None) -> str:
+    user_content = build_user_content(packet, user_query, language, advice_request)
     message = await anthropic_client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=150,
@@ -195,7 +218,7 @@ async def get_anthropic_advice(packet: ContextPacket, user_query: Optional[str],
     return clean_response_language(message.content[0].text, language)
 
 
-async def get_groq_advice(packet: ContextPacket, user_query: Optional[str], language: str = "en") -> str:
+async def get_groq_advice(packet: ContextPacket, user_query: Optional[str], language: str = "en", advice_request: "AdviceRequest | None" = None) -> str:
     if not CONFIG["groq_api_key"]:
         raise RuntimeError("GROQ_API_KEY is required when LLM_PROVIDER=groq")
 
@@ -205,7 +228,7 @@ async def get_groq_advice(packet: ContextPacket, user_query: Optional[str], lang
         "temperature": 0.2,
         "messages": [
             {"role": "system", "content": _system_prompt(language)},
-            {"role": "user", "content": build_user_content(packet, user_query, language)},
+            {"role": "user", "content": build_user_content(packet, user_query, language, advice_request)},
         ],
     }
     headers = {
@@ -219,7 +242,7 @@ async def get_groq_advice(packet: ContextPacket, user_query: Optional[str], lang
     return clean_response_language(data["choices"][0]["message"]["content"], language)
 
 
-async def get_gemini_advice(packet: ContextPacket, user_query: Optional[str], language: str = "en") -> str:
+async def get_gemini_advice(packet: ContextPacket, user_query: Optional[str], language: str = "en", advice_request: "AdviceRequest | None" = None) -> str:
     if not CONFIG["gemini_api_key"]:
         raise RuntimeError("GEMINI_API_KEY is required when LLM_PROVIDER=gemini")
 
@@ -229,7 +252,7 @@ async def get_gemini_advice(packet: ContextPacket, user_query: Optional[str], la
     )
     payload = {
         "system_instruction": {"parts": [{"text": _system_prompt(language)}]},
-        "contents": [{"parts": [{"text": build_user_content(packet, user_query, language)}]}],
+        "contents": [{"parts": [{"text": build_user_content(packet, user_query, language, advice_request)}]}],
         "generationConfig": {"maxOutputTokens": 150, "temperature": 0.4},
     }
     async with httpx.AsyncClient(timeout=15.0) as client:
@@ -239,14 +262,14 @@ async def get_gemini_advice(packet: ContextPacket, user_query: Optional[str], la
     return clean_response_language(data["candidates"][0]["content"]["parts"][0]["text"], language)
 
 
-async def get_advice(packet: ContextPacket, user_query: Optional[str], language: str = "en") -> str:
+async def get_advice(packet: ContextPacket, user_query: Optional[str], language: str = "en", advice_request: "AdviceRequest | None" = None) -> str:
     provider = CONFIG["llm_provider"].lower()
     if provider == "mock":
-        return get_mock_advice(packet, user_query, language)
+        return get_mock_advice(packet, user_query, language, advice_request)
     if provider == "anthropic":
-        return await get_anthropic_advice(packet, user_query, language)
+        return await get_anthropic_advice(packet, user_query, language, advice_request)
     if provider == "groq":
-        return await get_groq_advice(packet, user_query, language)
+        return await get_groq_advice(packet, user_query, language, advice_request)
     if provider == "gemini":
-        return await get_gemini_advice(packet, user_query, language)
+        return await get_gemini_advice(packet, user_query, language, advice_request)
     raise RuntimeError(f"Unsupported LLM_PROVIDER: {CONFIG['llm_provider']}")
