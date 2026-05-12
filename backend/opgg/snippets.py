@@ -47,26 +47,26 @@ def matchup_guide_to_snippet(data: dict, my_champion: str, opponent: str) -> Kno
     )
 
 
-def counters_to_snippet(data: dict, champion: str) -> KnowledgeSnippet | None:
+def fed_enemy_to_snippet(data: dict, fed_champion: str) -> KnowledgeSnippet | None:
+    """Snippet focused on how to play against the most fed enemy."""
     if not data:
         return None
     d = data.get("data", {})
     strong = d.get("strong_counters", [])
-    weak = d.get("weak_counters", [])
+    summary = d.get("summary", {}).get("average_stats", {})
+    win_rate = summary.get("win_rate")
 
-    parts = [f"[OP.GG 카운터] {champion}:"]
+    parts = [f"[OP.GG 주의] 가장 큰 상대 {fed_champion}:"]
+    if win_rate is not None:
+        pct = round(win_rate * 100, 1)
+        parts.append(f"현재 패치 승률 {pct}%")
     if strong:
         names = [c["champion_name"] for c in strong[:3]]
-        parts.append(f"불리한 상대: {', '.join(names)}")
-    if weak:
-        names = [c["champion_name"] for c in weak[:3]]
-        parts.append(f"유리한 상대: {', '.join(names)}")
-
-    if len(parts) == 1:
-        return None
+        parts.append(f"이 챔피언을 카운터하는 픽: {', '.join(names)}")
+    parts.append("교전 피하고 팀과 함께 대응")
 
     return KnowledgeSnippet(
-        source=f"opgg:counters:{champion.lower()}",
+        source=f"opgg:fed_enemy:{fed_champion.lower()}",
         content=" | ".join(parts),
-        relevance="medium",
+        relevance="high",
     )

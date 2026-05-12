@@ -31,7 +31,7 @@ from backend.llm.advisor import get_advice
 from backend.advice.planner import plan
 from backend.riot.live_client import fetch_game_state, GameState
 from backend.opgg.client import get_matchup_guide, get_champion_counters, infer_lane_opponent
-from backend.opgg.snippets import matchup_guide_to_snippet, counters_to_snippet
+from backend.opgg.snippets import matchup_guide_to_snippet, fed_enemy_to_snippet
 
 logger = logging.getLogger(__name__)
 active_websockets: set[WebSocket] = set()
@@ -191,32 +191,39 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 async def _fetch_opgg_snippets(state: GameState) -> list:
-    # Prefer cached inference; fall back to live_client's position-based guess
+    from backend.knowledge.schemas import KnowledgeSnippet
+
+    # lane opponent: prefer cached role_rate inference, fallback to live_client guess
     opponent = _cached_lane_opponent or (
         state.lane_opponent
         if state.lane_opponent and state.lane_opponent != "Unknown"
         else None
     )
+    fed = state.fed_enemy if state.fed_enemy and state.fed_enemy != "Unknown" else None
 
-    tasks = []
+    tasks: list = []
+    task_labels: list[str] = []
+
     if opponent:
         tasks.append(get_matchup_guide(state.champion_name, opponent, state.assigned_position))
-    tasks.append(get_champion_counters(state.champion_name, state.assigned_position))
+        task_labels.append("matchup")
+    elif fed:
+        # fallback: focus on the most fed enemy instead
+        tasks.append(get_champion_counters(fed, state.assigned_position))
+        task_labels.append("fed_enemy")
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    from backend.knowledge.schemas import KnowledgeSnippet
     snippets: list[KnowledgeSnippet] = []
-    idx = 0
-    if opponent:
-        r = results[idx]; idx += 1
-        if not isinstance(r, Exception) and r:
-            s = matchup_guide_to_snippet(r, state.champion_name, opponent)
-            if s:
-                snippets.append(s)
-    r = results[idx]
-    if not isinstance(r, Exception) and r:
-        s = counters_to_snippet(r, state.champion_name)
+    for label, result in zip(task_labels, results):
+        if isinstance(result, Exception) or not result:
+            continue
+        if label == "matchup":
+            s = matchup_guide_to_snippet(result, state.champion_name, opponent)
+        elif label == "fed_enemy":
+            s = fed_enemy_to_snippet(result, fed)
+        else:
+            continue
         if s:
             snippets.append(s)
     return snippets
