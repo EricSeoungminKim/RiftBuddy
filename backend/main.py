@@ -29,9 +29,6 @@ from backend.timeline.detectors.enemy_jungle_unknown import EnemyJungleUnknownDe
 from backend.context.question_planner import build_planned_question
 from backend.llm.advisor import get_advice
 from backend.riot.live_client import fetch_game_state, GameState
-from backend.voice.stt import is_valid_transcript
-from backend.voice.tts import text_to_speech_bytes
-from backend.voice.wake_word import capture_voice_question_once, run_wake_word_loop
 
 logger = logging.getLogger(__name__)
 active_websockets: set[WebSocket] = set()
@@ -47,21 +44,7 @@ _event_pipeline = EventDetectorPipeline(detectors=[
     EnemyJungleUnknownDetector(),
 ])
 _knowledge_collection = None
-wake_word_task: asyncio.Task | None = None
 _game_poll_task: asyncio.Task | None = None
-
-
-async def _start_wake_word_task() -> None:
-    global wake_word_task
-    if CONFIG["wake_word"] == "1":
-        wake_word_task = asyncio.create_task(run_wake_word_loop(broadcast_wake_ack, broadcast_voice_question))
-
-
-async def _stop_wake_word_task() -> None:
-    if wake_word_task:
-        wake_word_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await wake_word_task
 
 
 def _game_state_to_ws_payload(state: GameState) -> dict:
@@ -117,12 +100,10 @@ async def lifespan(_: FastAPI):
         data_dir=Path("backend/knowledge/data"),
         db_path=Path(".chroma_db"),
     )
-    await _start_wake_word_task()
     _game_poll_task = asyncio.create_task(_poll_game_state())
     try:
         yield
     finally:
-        await _stop_wake_word_task()
         if _game_poll_task:
             _game_poll_task.cancel()
             with suppress(asyncio.CancelledError):
@@ -163,51 +144,11 @@ async def websocket_endpoint(websocket: WebSocket):
             mode = msg.get("mode")
             language = msg.get("language") or CONFIG["response_language"]
 
-            if action == "listen":
-                await websocket.send_json(
-                    {
-                        "type": "listening",
-                        "text": "준비하세요. 곧 말하면 됩니다..." if language == "ko" else "Get ready. Speak in a moment...",
-                    }
-                )
-                await asyncio.sleep(float(CONFIG["question_prepare_seconds"]))
-                await websocket.send_json(
-                    {
-                        "type": "listening",
-                        "text": "Buddy가 듣고 있습니다..." if language == "ko" else "Buddy is listening...",
-                    }
-                )
-                question = await capture_voice_question_once()
-                if not is_valid_transcript(question):
-                    await websocket.send_json(
-                        {
-                            "type": "error",
-                            "message": "질문을 제대로 듣지 못했습니다. 다시 눌러 말해주세요."
-                            if language == "ko"
-                            else "I could not hear the question. Press the hotkey and try again.",
-                        }
-                    )
-                    continue
-                await websocket.send_json({"type": "transcript", "text": question})
-                await send_advice(websocket, user_query=question, language=language)
-            else:
-                await send_advice(websocket, user_query=user_query, language=language, planned=mode == "planned")
+            await send_advice(websocket, user_query=user_query, language=language, planned=mode == "planned")
     except WebSocketDisconnect:
         pass
     finally:
         active_websockets.discard(websocket)
-
-
-async def broadcast_wake_ack(transcript: str) -> None:
-    for websocket in list(active_websockets):
-        await websocket.send_json({"type": "transcript", "text": transcript})
-        await websocket.send_json({"type": "listening", "text": "Buddy가 듣고 있습니다..."})
-
-
-async def broadcast_voice_question(question: str) -> None:
-    for websocket in list(active_websockets):
-        await websocket.send_json({"type": "transcript", "text": question})
-        await send_advice(websocket, user_query=question, language=CONFIG["response_language"])
 
 
 async def send_advice(websocket: WebSocket, user_query: str | None, language: str, planned: bool = False) -> None:
@@ -253,19 +194,10 @@ async def send_advice(websocket: WebSocket, user_query: str | None, language: st
             creep_score=packet.creep_score,
         )
     advice = await get_advice(packet, user_query=user_query, language=language)
-    audio_bytes = None
-    audio_error = None
-    try:
-        audio_bytes = await text_to_speech_bytes(advice)
-    except Exception as exc:
-        logger.warning("TTS failed; sending text advice without audio: %s", exc)
-        audio_error = "Voice output unavailable. Check ElevenLabs credits, billing, or API permissions."
-
     await websocket.send_json(
         {
             "type": "advice",
             "text": advice,
-            "audio_error": audio_error,
             "context": {
                 "health_percent": packet.health_percent,
                 "gold": packet.gold,
@@ -274,5 +206,3 @@ async def send_advice(websocket: WebSocket, user_query: str | None, language: st
             },
         }
     )
-    if audio_bytes:
-        await websocket.send_bytes(audio_bytes)

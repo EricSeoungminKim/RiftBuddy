@@ -201,8 +201,7 @@ def test_knowledge_snippets_injected_into_summary(tmp_path):
 
     with patch("backend.main._knowledge_collection", collection), \
          patch("backend.main.fetch_game_state", AsyncMock(return_value=fake_state)), \
-         patch("backend.main.get_advice", fake_get_advice), \
-         patch("backend.main.text_to_speech_bytes", AsyncMock(return_value=b"")):
+         patch("backend.main.get_advice", fake_get_advice):
         from backend.main import app
         client = TestClient(app)
         with client.websocket_connect("/ws") as ws:
