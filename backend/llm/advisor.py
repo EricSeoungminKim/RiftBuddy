@@ -3,11 +3,11 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Optional
 
-if TYPE_CHECKING:
-    from backend.advice.schemas import AdviceRequest
-
 import anthropic
 import httpx
+
+if TYPE_CHECKING:
+    from backend.advice.schemas import AdviceRequest
 
 from backend.config import CONFIG
 from backend.context.engine import ContextPacket
