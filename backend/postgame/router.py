@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from backend.config import CONFIG
 from backend.context.engine import ContextPacket
 from backend.game_session import GameSession
 from backend.knowledge.performance_seeds import save_game_seed
 from backend.llm.advisor import get_advice
+from backend.opgg.client import get_last_match, get_champion_analysis_for_comparison
 from backend.riot.live_client import GameState
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 game_session = GameSession()
@@ -54,6 +61,40 @@ async def add_snapshot(payload: SnapshotPayload):
     return {"stored": len(game_session.snapshots)}
 
 
+async def _fetch_opgg_postgame_data(session: GameSession) -> tuple[dict | None, dict | None]:
+    """Fetch OP.GG last match + Diamond avg stats for seed enrichment."""
+    game_name = CONFIG.get("riot_game_name", "")
+    tag_line = CONFIG.get("riot_tag_line", "")
+    region = CONFIG.get("riot_region", "KR")
+    if not game_name or not tag_line:
+        return None, None
+
+    snaps = session.snapshots
+    champion = snaps[-1].champion_name if snaps else ""
+    position = snaps[-1].assigned_position if snaps else ""
+
+    async def _noop() -> None:
+        return None
+
+    try:
+        avg_coro = (
+            get_champion_analysis_for_comparison(champion, position)
+            if champion and position
+            else _noop()
+        )
+        match, avg = await asyncio.gather(
+            get_last_match(game_name, tag_line, region=region),
+            avg_coro,
+            return_exceptions=True,
+        )
+        opgg_match = match if not isinstance(match, Exception) else None
+        opgg_avg = avg if not isinstance(avg, Exception) else None
+        return opgg_match, opgg_avg
+    except Exception as exc:
+        logger.warning("OP.GG postgame fetch failed: %s", exc)
+        return None, None
+
+
 @router.post("/postgame/coach")
 async def coach():
     if game_session.is_empty:
@@ -62,7 +103,8 @@ async def coach():
     import backend.main as _main
     collection = _main.get_knowledge_collection()
     if collection is not None:
-        save_game_seed(game_session, collection)
+        opgg_match, opgg_avg = await _fetch_opgg_postgame_data(game_session)
+        save_game_seed(game_session, collection, opgg_match=opgg_match, opgg_avg_stats=opgg_avg)
 
     lines_text = "\n".join(game_session.summary_lines())
     prompt = f"""다음은 리그 오브 레전드 게임 중 30초 간격으로 기록된 상태 스냅샷입니다:

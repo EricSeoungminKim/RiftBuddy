@@ -38,6 +38,13 @@ class GameSummary:
     ally_champions: tuple[str, ...] = field(default_factory=tuple)
     enemy_champions: tuple[str, ...] = field(default_factory=tuple)
     key_moments: list[str] = field(default_factory=list)
+    # OP.GG enriched fields
+    op_score: float | None = None
+    op_score_rank: str | None = None       # "MVP", "ACE", or None
+    damage_dealt: int | None = None
+    items: list[str] = field(default_factory=list)
+    avg_tier: str | None = None            # e.g. "GOLD", "PLATINUM"
+    cs_vs_avg_pct: float | None = None     # e.g. 1.15 = 15% above avg
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +138,25 @@ def generate_seed_text(summary: GameSummary) -> str:
     if summary.enemy_champions:
         base += f" Enemy comp: {', '.join(summary.enemy_champions)}."
 
+    # A: OP.GG performance comparison vs average
+    if summary.op_score is not None:
+        grade_parts = [f"OP.GG score: {summary.op_score:.1f}"]
+        if summary.op_score_rank:
+            grade_parts.append(summary.op_score_rank)
+        base += f" {' | '.join(grade_parts)}."
+    if summary.cs_vs_avg_pct is not None:
+        cs_diff = int((summary.cs_vs_avg_pct - 1.0) * 100)
+        sign = "+" if cs_diff >= 0 else ""
+        base += f" CS vs Diamond avg: {sign}{cs_diff}%."
+    if summary.damage_dealt is not None:
+        base += f" Total damage: {summary.damage_dealt:,}."
+    if summary.items:
+        base += f" Final build: {', '.join(summary.items)}."
+
+    # C: score trend / grade
+    if summary.avg_tier:
+        base += f" Match avg tier: {summary.avg_tier}."
+
     if not summary.key_moments:
         return base
 
@@ -149,7 +175,7 @@ def embed_performance_seed(
     summary: GameSummary,
     seed_text: str,
 ) -> str:
-    now = datetime.utcnow()
+    now = datetime.now().astimezone()
     doc_id = f"perf_{summary.champion.lower()}_{now.strftime('%Y%m%d%H%M%S%f')}"
     collection.add(
         documents=[seed_text],
@@ -165,6 +191,8 @@ def embed_performance_seed(
             "lane_opponent": summary.lane_opponent or "",
             "ally_comp": ", ".join(summary.ally_champions),
             "enemy_comp": ", ".join(summary.enemy_champions),
+            "op_score": summary.op_score or 0.0,
+            "op_score_rank": summary.op_score_rank or "",
             "source": "performance",
             "date": now.strftime("%Y-%m-%d"),
         }],
@@ -179,6 +207,8 @@ def embed_performance_seed(
 def save_game_seed(
     session: "GameSession",
     collection: "chromadb.Collection",
+    opgg_match: dict | None = None,
+    opgg_avg_stats: dict | None = None,
 ) -> str | None:
     if session.is_empty:
         return None
@@ -186,6 +216,41 @@ def save_game_seed(
     summary = summarize_session(session)
     if summary is None:
         return None
+
+    # Enrich from OP.GG last match
+    if opgg_match:
+        participants = opgg_match.get("participants", [])
+        # Find the player's own participant entry (match by summoner name)
+        own = next(
+            (p for p in participants if p.get("team_key") == "ORDER" or True),
+            None,
+        )
+        # Better: find by champion name matching the summary
+        own = next(
+            (p for p in participants if p.get("champion_name", "").upper() == summary.champion.upper()),
+            participants[0] if participants else None,
+        )
+        if own:
+            stats = own.get("stats", {})
+            summary.op_score = stats.get("op_score")
+            rank = stats.get("op_score_rank")
+            summary.op_score_rank = rank if rank in ("MVP", "ACE") else None
+            summary.damage_dealt = stats.get("total_damage_dealt_to_champions")
+            summary.items = own.get("items_names", [])
+        tier_info = opgg_match.get("average_tier_info", {})
+        summary.avg_tier = tier_info.get("tier")
+
+    # Enrich CS comparison from OP.GG champion analysis
+    if opgg_avg_stats:
+        avg_data = (
+            opgg_avg_stats.get("data", {})
+            .get("summary", {})
+            .get("average_stats", {})
+        )
+        avg_cs_per_min = avg_data.get("cs_per_min")
+        if avg_cs_per_min and summary.game_duration_minutes > 0:
+            my_cs_per_min = summary.avg_cs / summary.game_duration_minutes
+            summary.cs_vs_avg_pct = my_cs_per_min / avg_cs_per_min
 
     seed_text = generate_seed_text(summary)
     return embed_performance_seed(collection, summary, seed_text)
