@@ -1,4 +1,3 @@
-import pytest
 from backend.advice.planner import plan
 from backend.advice.schemas import AdviceRequest
 from backend.timeline.schemas import DetectedEvent, Severity

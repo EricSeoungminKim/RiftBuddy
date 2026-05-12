@@ -2,10 +2,10 @@ from backend.advice.schemas import AdviceRequest
 from backend.timeline.schemas import DetectedEvent, Severity
 from backend.knowledge.schemas import KnowledgeSnippet
 
+# OBJECTIVE_SPAWN intentionally omitted — falls through to "MACRO" default
 _MODE_MAP: dict[str, str] = {
     "LOW_HEALTH": "DEFENSIVE",
     "GOLD_SPIKE": "RECALL",
-    "OBJECTIVE_SPAWN": "MACRO",
     "DEATH_STREAK": "DEFENSIVE",
 }
 
