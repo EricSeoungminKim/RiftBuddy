@@ -30,6 +30,8 @@ from backend.context.question_planner import build_planned_question
 from backend.llm.advisor import get_advice
 from backend.advice.planner import plan
 from backend.riot.live_client import fetch_game_state, GameState
+from backend.opgg.client import get_matchup_guide, get_champion_counters
+from backend.opgg.snippets import matchup_guide_to_snippet, counters_to_snippet
 
 logger = logging.getLogger(__name__)
 active_websockets: set[WebSocket] = set()
@@ -160,6 +162,31 @@ async def websocket_endpoint(websocket: WebSocket):
         active_websockets.discard(websocket)
 
 
+async def _fetch_opgg_snippets(state: GameState) -> list:
+    tasks = []
+    has_opponent = bool(state.lane_opponent and state.lane_opponent != "Unknown")
+    if has_opponent:
+        tasks.append(get_matchup_guide(state.champion_name, state.lane_opponent, state.assigned_position))
+    tasks.append(get_champion_counters(state.champion_name, state.assigned_position))
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    snippets: list[KnowledgeSnippet] = []
+    idx = 0
+    if has_opponent:
+        r = results[idx]; idx += 1
+        if not isinstance(r, Exception) and r:
+            s = matchup_guide_to_snippet(r, state.champion_name, state.lane_opponent)
+            if s:
+                snippets.append(s)
+    r = results[idx]
+    if not isinstance(r, Exception) and r:
+        s = counters_to_snippet(r, state.champion_name)
+        if s:
+            snippets.append(s)
+    return snippets
+
+
 async def send_advice(websocket: WebSocket, user_query: str | None, language: str, planned: bool = False) -> None:
     game_state = await fetch_game_state()
     if game_state is None:
@@ -189,6 +216,10 @@ async def send_advice(websocket: WebSocket, user_query: str | None, language: st
         collection=_knowledge_collection,
         performance_collection=_performance_collection,
     ) if _knowledge_collection is not None else []
+
+    opgg_snippets = await _fetch_opgg_snippets(game_state)
+    knowledge_snippets = opgg_snippets + knowledge_snippets
+
     advice_request = plan(detected_events, knowledge_snippets)
     advice = await get_advice(packet, user_query=user_query, language=language, advice_request=advice_request)
     await websocket.send_json(
