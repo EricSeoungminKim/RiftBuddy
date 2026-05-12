@@ -7,6 +7,8 @@ _MODE_MAP: dict[str, str] = {
     "LOW_HEALTH": "DEFENSIVE",
     "GOLD_SPIKE": "RECALL",
     "DEATH_STREAK": "DEFENSIVE",
+    "CS_DROP": "MACRO",
+    "VISION_WARNING": "MACRO",
 }
 
 def plan(events: list[DetectedEvent], snippets: list[KnowledgeSnippet]) -> AdviceRequest:
