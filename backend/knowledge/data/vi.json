@@ -2,7 +2,11 @@
   "champion": "vi",
   "gameplan": {
     "summary": "Gank with point-and-click ult lockdown and snowball carries. Transition into frontline bruiser.",
-    "power_spikes": ["level 6 (Assault and Battery)", "Trinity Force", "full bruiser build"],
+    "power_spikes": [
+      "level 6 (Assault and Battery)",
+      "Trinity Force",
+      "full bruiser build"
+    ],
     "win_condition": "Ult the enemy carry in every teamfight. Use W armor shred to enable your team.",
     "early_game": "Q gap-close for early ganks level 3. E W passive gives strong dueling. Farm to 6 fast.",
     "positioning": "Initiate with ult on carry. Peel with Q for your own carries after initial engage."

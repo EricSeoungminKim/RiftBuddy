@@ -2,7 +2,11 @@
   "champion": "darius",
   "gameplan": {
     "summary": "Win lane through bleed stacks and all-ins. Snowball kills into Noxian Might for free kills.",
-    "power_spikes": ["level 3 (full combo)", "Stridebreaker", "Noxian Might active (5 stacks)"],
+    "power_spikes": [
+      "level 3 (full combo)",
+      "Stridebreaker",
+      "Noxian Might active (5 stacks)"
+    ],
     "win_condition": "Stack bleed to 5 and execute with Noxus Guillotine. Dominate side lane.",
     "early_game": "Level 1 E to pull then Q heal. Level 3 is first kill window. Max Q.",
     "positioning": "Flank at choke points. Use E to pull isolated targets. Never fight without Tenacity vs CC."

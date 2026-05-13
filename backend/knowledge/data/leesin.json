@@ -2,7 +2,11 @@
   "champion": "leesin",
   "gameplan": {
     "summary": "Dominate early game with Q gank threat. Snowball kills before falling off at 3 items.",
-    "power_spikes": ["level 3 (Q+E+W combo)", "Serpent's Fang", "early first back powerspike"],
+    "power_spikes": [
+      "level 3 (Q+E+W combo)",
+      "Serpent's Fang",
+      "early first back powerspike"
+    ],
     "win_condition": "Gank lanes early, get ahead, and use Insec kick in teamfights to displace carries.",
     "early_game": "Q → Q2 for execute. W to sustain. E to slow and shred armor. Invade enemy jungle at level 2.",
     "positioning": "Stay mobile. Insec kick: Q target, ward jump behind, R to kick into team."

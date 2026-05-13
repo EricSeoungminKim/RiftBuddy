@@ -2,7 +2,11 @@
   "champion": "ahri",
   "gameplan": {
     "summary": "Roam after shoving waves and pick off isolated targets with charm. Scale into mobile assassin.",
-    "power_spikes": ["level 6 (Spirit Rush roam)", "Luden's Tempest", "full build"],
+    "power_spikes": [
+      "level 6 (Spirit Rush roam)",
+      "Luden's Tempest",
+      "full build"
+    ],
     "win_condition": "Charm into full combo for picks. Never fight fair — use Spirit Rush to outmaneuver.",
     "early_game": "Q for waveclear and poke. E charm is your kill threat. Never use E defensively — save it for kills.",
     "positioning": "Flank from side in teamfights. Spirit Rush in, charm, combo, Spirit Rush out."

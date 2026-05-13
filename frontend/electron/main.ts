@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, screen } from "electron";
 import { exec } from "child_process";
 import path from "path";
 import {
@@ -28,11 +28,17 @@ function logChampSelectState(inProgress: boolean, draftVisible: boolean): void {
 }
 
 function createOverlayWindow(): BrowserWindow {
+  const { workArea } = screen.getPrimaryDisplay();
+  const winWidth = 520;
+  const winHeight = 420;
+  const margin = 16;
+  const initX = workArea.x + workArea.width - winWidth - margin;
+  const initY = workArea.y + margin;
   const win = new BrowserWindow({
-    width: 520,
-    height: 420,
-    x: 1360,
-    y: 90,
+    width: winWidth,
+    height: winHeight,
+    x: initX,
+    y: initY,
     type: "panel",
     transparent: true,
     frame: false,

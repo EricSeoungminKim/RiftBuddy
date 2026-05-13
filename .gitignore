@@ -58,3 +58,7 @@ Thumbs.db
 
 # ChromaDB local vector store
 .chroma_db/
+
+# Misc
+docs/
+*.png

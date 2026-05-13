@@ -87,6 +87,12 @@ async def fetch_game_state() -> Optional[GameState]:
         player = data["activePlayer"]
         stats = player["championStats"]
         active_player = _find_active_player(data)
+        if not active_player:
+            logger.warning(
+                "Could not match activePlayer (riotId=%r summonerName=%r) in allPlayers — CS/KDA will be 0",
+                data.get("activePlayer", {}).get("riotId"),
+                data.get("activePlayer", {}).get("summonerName"),
+            )
         champion_groups = _extract_champion_groups(data, active_player)
         gold_totals = _estimate_team_gold(data, active_player)
         return GameState(
@@ -123,10 +129,12 @@ async def fetch_game_state() -> Optional[GameState]:
 
 
 def _find_active_player(data: dict) -> dict:
-    active_name = data.get("activePlayer", {}).get("riotId")
-    active_summoner = data.get("activePlayer", {}).get("summonerName")
+    active_name = (data.get("activePlayer", {}).get("riotId") or "").strip().lower()
+    active_summoner = (data.get("activePlayer", {}).get("summonerName") or "").strip().lower()
     for player in data.get("allPlayers", []):
-        if player.get("riotId") == active_name or player.get("summonerName") == active_summoner:
+        p_riot = (player.get("riotId") or "").strip().lower()
+        p_summoner = (player.get("summonerName") or "").strip().lower()
+        if (active_name and p_riot == active_name) or (active_summoner and p_summoner == active_summoner):
             return player
     return {}
 

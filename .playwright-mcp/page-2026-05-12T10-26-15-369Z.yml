@@ -1,0 +1,67 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "Post-game Coaching Report" [level=1] [ref=e6]
+      - paragraph [ref=e7]: 경기 기록은 feedback dashboard로 보여주고, 동시에 다음 게임을 위한 performance seed로 저장됩니다.
+    - button "새 게임 준비" [ref=e8] [cursor=pointer]
+  - main [ref=e13]:
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - img [ref=e17]
+          - generic [ref=e20]:
+            - generic [ref=e21]: "77"
+            - generic [ref=e22]: Rift score
+        - generic [ref=e23]:
+          - generic [ref=e24]: Match summary
+          - heading "Caitlyn · BOTTOM" [level=2] [ref=e78]
+          - paragraph [ref=e26]: 30분 · KDA 7/2/9 · 205 CS
+          - generic [ref=e27]:
+            - generic [ref=e28]:
+              - generic [ref=e29]: CS/min
+              - generic [ref=e30]: "6.8"
+            - generic [ref=e31]:
+              - generic [ref=e32]: Diamond CS
+              - generic [ref=e33]: No benchmark
+            - generic [ref=e34]:
+              - generic [ref=e35]: Avg gold diff
+              - generic [ref=e36]: "+267"
+            - generic [ref=e37]:
+              - generic [ref=e38]: Seed
+              - generic [ref=e39]: Saved
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - generic [ref=e43]: Performance timeline
+            - heading "CS and gold flow" [level=3] [ref=e44]
+          - generic [ref=e45]: none
+        - generic [ref=e46]:
+          - img [ref=e47]
+          - generic [ref=e50]:
+            - generic [ref=e51]: ● CS
+            - generic [ref=e52]: ● Gold diff
+      - generic [ref=e53]:
+        - generic [ref=e54]: Coach feedback
+        - heading "잘한 점" [level=3] [ref=e55]
+        - paragraph [ref=e56]: Caitlyn BOTTOM로 30.0분 동안 KDA 7/2/9, 6.8 CS/min을 기록했습니다. 평균 골드 차이는 +267로, 리드가 있는 구간에서는 tempo를 만들 수 있었습니다.
+      - generic [ref=e57]:
+        - generic [ref=e58]: Coach feedback
+        - heading "개선할 점" [level=3] [ref=e59]
+        - paragraph [ref=e60]: CS benchmark가 없어 절대 CS/min 기준으로만 판단했습니다. 다음 게임에서는 첫 귀환 전 wave 손실과 사망 직전 위치를 더 엄격하게 관리하세요. 특히 death가 발생한 시간대는 다음 게임 proactive warning의 후보가 됩니다.
+    - complementary [ref=e61]:
+      - generic [ref=e62]:
+        - generic [ref=e63]: Coach feedback
+        - heading "주요 순간" [level=3] [ref=e64]
+        - paragraph [ref=e65]: "Died at 20:00 Best CS window: 10:00 - 30:00 Gold peak: +900 at 30:00"
+      - generic [ref=e66]:
+        - generic [ref=e67]: Coach feedback
+        - heading "다음 게임 목표" [level=3] [ref=e68]
+        - paragraph [ref=e69]: 1. 10분 CS 목표를 benchmark 대비 -5% 이내로 유지 2. 과거 death window 1분 전에는 wave를 밀기보다 시야와 체력 상태를 먼저 확인 3. 골드 리드가 있을 때는 즉시 아이템 전환 후 objective setup으로 연결
+      - generic [ref=e70]:
+        - generic [ref=e71]: Stored memory
+        - heading "Self-improving loop" [level=3] [ref=e72]
+        - paragraph [ref=e73]: 이 리포트의 핵심 기록은 ChromaDB performance seed로 저장됩니다. 다음 게임에서는 이 기록이 RAG와 proactive warning에 다시 사용됩니다.
+        - list [ref=e74]:
+          - listitem [ref=e79]: Died at 20:00
+          - listitem [ref=e80]: "Best CS window: 10:00 - 30:00"
+          - listitem [ref=e81]: "Gold peak: +900 at 30:00"

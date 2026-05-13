@@ -36,6 +36,7 @@ from backend.opgg.client import get_matchup_guide, get_champion_counters, infer_
 from backend.opgg.snippets import matchup_guide_to_snippet, fed_enemy_to_snippet
 from backend.stats.riot_cs_benchmarks import fetch_cs_benchmark, normalize_position
 from backend.timeline.proactive_coach import ProactiveCoachSession, generate_proactive_warning
+from backend.knowledge.performance_seeds import save_game_seed
 
 logger = logging.getLogger(__name__)
 active_websockets: set[WebSocket] = set()
@@ -224,6 +225,12 @@ async def _broadcast_game_end() -> None:
     if _game_end_sent:
         return
     _game_end_sent = True
+    if _performance_collection is not None and not _game_session.is_empty and not _game_session.seed_doc_id:
+        try:
+            _game_session.seed_doc_id = save_game_seed(_game_session, _performance_collection)
+            logger.info("Auto-saved performance seed: %s", _game_session.seed_doc_id)
+        except Exception as exc:
+            logger.warning("Auto-save performance seed failed: %s", exc)
     for ws in list(active_websockets):
         try:
             await ws.send_json({"type": "game_end"})

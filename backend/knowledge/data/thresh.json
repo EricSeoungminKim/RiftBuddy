@@ -2,7 +2,11 @@
   "champion": "thresh",
   "gameplan": {
     "summary": "Control lane with hook threats, stack souls for scaling, and carry with Lantern + Death Sentence combos.",
-    "power_spikes": ["level 2 (Q+E combo)", "40 souls", "Locket + Knight's Vow"],
+    "power_spikes": [
+      "level 2 (Q+E combo)",
+      "40 souls",
+      "Locket + Knight's Vow"
+    ],
     "win_condition": "Create picks with Death Sentence then snowball. Peel for ADC in teamfights with Flay.",
     "early_game": "Level 1 Q hook onto overextended targets. Level 2 all-in with E slow. Always collect souls.",
     "positioning": "Roam constantly. Drop Lantern for teammates in danger. Save W for clutch plays."

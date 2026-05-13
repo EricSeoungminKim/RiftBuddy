@@ -2,7 +2,11 @@
   "champion": "jinx",
   "gameplan": {
     "summary": "Scale safely to 3 items then hypercarry teamfights with Fishbones AoE. Never get caught alone.",
-    "power_spikes": ["level 6 (Super Mega Death Rocket)", "Kraken Slayer + Runaan's", "full build"],
+    "power_spikes": [
+      "level 6 (Super Mega Death Rocket)",
+      "Kraken Slayer + Runaan's",
+      "full build"
+    ],
     "win_condition": "Stay safe in teamfights behind your frontline. Let Fishbones shred grouped enemies.",
     "early_game": "Farm safely with Minigun. Only poke with Fishbones when mana allows. Play for 3 items.",
     "positioning": "Extreme backline. Never walk up without peel. Use E traps to create distance from divers."

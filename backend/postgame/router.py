@@ -3,14 +3,15 @@ from __future__ import annotations
 import asyncio
 import logging
 
+import httpx
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from backend.config import CONFIG
-from backend.context.engine import ContextPacket
 from backend.game_session import GameSession
 from backend.knowledge.performance_seeds import save_game_seed, summarize_session
-from backend.llm.advisor import get_advice
+from backend.llm.advisor import get_advice, GROQ_CHAT_COMPLETIONS_URL, _system_prompt
 from backend.opgg.client import get_last_match, get_champion_analysis_for_comparison
 from backend.riot.live_client import GameState
 from backend.stats.riot_cs_benchmarks import fetch_cs_benchmark
@@ -177,6 +178,41 @@ async def _fetch_postgame_seed_data(session: GameSession) -> tuple[dict | None, 
         return None, None, "none"
 
 
+async def _call_llm_for_postgame(prompt: str) -> str:
+    """Direct LLM call for postgame — bypasses build_user_content to avoid payload bloat."""
+    provider = CONFIG["llm_provider"].lower()
+    if provider == "mock":
+        return ""
+    if provider == "groq":
+        if not CONFIG["groq_api_key"]:
+            raise RuntimeError("GROQ_API_KEY required")
+        payload = {
+            "model": CONFIG["groq_model"],
+            "max_tokens": 800,
+            "temperature": 0.3,
+            "messages": [
+                {"role": "system", "content": _system_prompt("ko")},
+                {"role": "user", "content": prompt},
+            ],
+        }
+        headers = {"Authorization": f"Bearer {CONFIG['groq_api_key']}", "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(GROQ_CHAT_COMPLETIONS_URL, json=payload, headers=headers)
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+    if provider == "anthropic":
+        import anthropic as _anthropic
+        from backend.llm.advisor import anthropic_client
+        msg = await anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=800,
+            system=_system_prompt("ko"),
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return msg.content[0].text
+    raise RuntimeError(f"Unsupported provider for postgame: {provider}")
+
+
 @router.post("/postgame/coach")
 async def coach():
     if game_session.is_empty:
@@ -195,7 +231,26 @@ async def coach():
                 avg_stats_source=avg_source,
             )
 
-    lines_text = "\n".join(game_session.summary_lines())
+    all_lines = game_session.summary_lines()
+    # Budget ~3000 chars for snapshot block (leaves room for prompt template + response).
+    # Sample evenly so early/mid/late game are all represented.
+    SNAPSHOT_CHAR_BUDGET = 3000
+    full_text = "\n".join(all_lines)
+    if len(full_text) <= SNAPSHOT_CHAR_BUDGET:
+        lines_text = full_text
+    else:
+        # Binary search for the largest even sample that fits the budget
+        lo, hi = 1, len(all_lines)
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            step = len(all_lines) / mid
+            sampled = [all_lines[int(i * step)] for i in range(mid)]
+            if len("\n".join(sampled)) <= SNAPSHOT_CHAR_BUDGET:
+                lo = mid
+            else:
+                hi = mid - 1
+        step = len(all_lines) / lo
+        lines_text = "\n".join(all_lines[int(i * step)] for i in range(lo))
     prompt = f"""다음은 리그 오브 레전드 게임 중 30초 간격으로 기록된 상태 스냅샷입니다:
 
 {lines_text}
@@ -221,15 +276,8 @@ async def coach():
 [다음 게임 목표]
 (위 분석을 바탕으로 다음 게임에서 집중해야 할 2-3가지 구체적 목표)"""
 
-    dummy_packet = ContextPacket(
-        health_percent=100.0,
-        gold=0.0,
-        level=1,
-        game_time_minutes=0.0,
-        summary=prompt,
-    )
     try:
-        raw = await get_advice(dummy_packet, user_query=prompt, language="ko")
+        raw = await _call_llm_for_postgame(prompt)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"LLM error: {exc}")
 

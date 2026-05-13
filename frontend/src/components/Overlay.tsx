@@ -5,7 +5,7 @@ import { StatusBar } from "./StatusBar";
 import { TabBar } from "./overlay/TabBar";
 
 export function Overlay() {
-  const { lastError, isConnected, messages, requestPlannedAdvice, requestMatchup, requestItems, requestMacro } = useWebSocket();
+  const { isConnected, isLoading, messages, requestPlannedAdvice, requestMatchup, requestItems, requestMacro } = useWebSocket();
   const [language, setLanguage] = useState((import.meta.env.VITE_RIFTBUDDY_RESPONSE_LANGUAGE as string) ?? "ko");
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -47,7 +47,7 @@ export function Overlay() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [lastError, messages]);
+  }, [messages]);
 
   return (
     <div
@@ -76,14 +76,14 @@ export function Overlay() {
           maskImage: "linear-gradient(to bottom, transparent 0, black 18px, black calc(100% - 10px), transparent 100%)",
         }}
       >
-        {lastError && <AdviceCard role="system" text={lastError} />}
         {messages.map((message, index) => (
           <AdviceCard
-            key={`${message.role}-${index}-${message.text}`}
+            key={message.id ?? `${message.role}-${index}-${message.text}`}
             role={message.role}
             text={message.text}
             source={message.source}
             createdAt={message.createdAt}
+            isLoading={isLoading && message.id === "loading-indicator"}
           />
         ))}
       </div>

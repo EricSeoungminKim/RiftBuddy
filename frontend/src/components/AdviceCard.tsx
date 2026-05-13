@@ -3,6 +3,7 @@ interface Props {
   text: string;
   source?: "ai" | "opgg" | "proactive" | "status";
   createdAt?: string;
+  isLoading?: boolean;
 }
 
 const SOURCE_STYLES = {
@@ -36,7 +37,7 @@ const SOURCE_STYLES = {
   },
 };
 
-export function AdviceCard({ role = "buddy", text, source = "ai", createdAt }: Props) {
+export function AdviceCard({ role = "buddy", text, source = "ai", createdAt, isLoading = false }: Props) {
   const variant = role === "buddy" ? SOURCE_STYLES[source] : undefined;
   const label = role === "user" ? "USER" : role === "system" ? "System" : variant?.label ?? "AI 코치";
   const labelColor = role === "user" ? "#9cff57" : role === "system" ? "#ff6d6d" : variant?.color ?? "#16e0c5";
@@ -91,7 +92,26 @@ export function AdviceCard({ role = "buddy", text, source = "ai", createdAt }: P
           <span style={{ color: "rgba(232, 238, 247, 0.46)", fontSize: 10, marginLeft: "auto" }}>{createdAt}</span>
         )}
       </div>
-      <div>{text}</div>
+      {isLoading ? (
+        <div style={{ display: "flex", gap: 4, alignItems: "center", height: 18 }}>
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: "50%",
+                background: labelColor,
+                opacity: 0.7,
+                animation: `rb-pulse 1.1s ease-in-out ${i * 0.2}s infinite`,
+              }}
+            />
+          ))}
+          <style>{`@keyframes rb-pulse { 0%,80%,100%{transform:scale(0.6);opacity:0.3} 40%{transform:scale(1);opacity:1} }`}</style>
+        </div>
+      ) : (
+        <div>{text}</div>
+      )}
     </div>
   );
 }

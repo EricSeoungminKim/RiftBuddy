@@ -2,7 +2,11 @@
   "champion": "zed",
   "gameplan": {
     "summary": "Assassinate squishy carries with W+R combo. Snowball kills before enemy builds armor.",
-    "power_spikes": ["level 6 (Death Mark)", "Youmuu's + Serpent's Fang", "3 lethality items"],
+    "power_spikes": [
+      "level 6 (Death Mark)",
+      "Youmuu's + Serpent's Fang",
+      "3 lethality items"
+    ],
     "win_condition": "One-shot the enemy ADC or APC in every teamfight. Use shadows for mobility escapes.",
     "early_game": "Q poke safely. Level 6 first kill window. Never waste W — it's your only escape.",
     "positioning": "Flank from fog of war. W behind enemy carries. Ult onto isolated target, never into frontline."

@@ -2,7 +2,11 @@
   "champion": "yasuo",
   "gameplan": {
     "summary": "Scale into an unstoppable carry with knockup combos and unlimited Windwall. Win through mobility.",
-    "power_spikes": ["level 3 (Q tornado)", "Immortal Shieldbow + Infinity Edge", "full build"],
+    "power_spikes": [
+      "level 3 (Q tornado)",
+      "Immortal Shieldbow + Infinity Edge",
+      "full build"
+    ],
     "win_condition": "Set up Last Breath combos with allied knockups. Dash through minions to avoid skillshots.",
     "early_game": "Q stack tornado poke. E through minions aggressively. Shield absorbs one hit — trade into it.",
     "positioning": "Dash to backline in teamfights. Never stand still — constant E dashing makes you impossible to hit."

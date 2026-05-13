@@ -1,0 +1,10 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "Post-game Coaching Report" [level=1] [ref=e6]
+      - paragraph [ref=e7]: 경기 기록은 feedback dashboard로 보여주고, 동시에 다음 게임을 위한 performance seed로 저장됩니다.
+    - button "새 게임 준비" [ref=e8] [cursor=pointer]
+  - generic [ref=e9]:
+    - generic [ref=e10]: Analyzing match
+    - generic [ref=e11]: 코칭 리포트 생성 중...
+    - paragraph [ref=e12]: timeline, CS pace, seed 저장 상태를 정리하고 있습니다.
